@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "QR Based Billing (Android)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554",
+            "program": "lib/main.dart",
+            "args": [
+                "--debug"
+            ]
+        },
+        {
+            "name": "QR Based Billing (Chrome)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "chrome",
+            "program": "lib/main.dart"
+        },
+        {
+            "name": "QR Based Billing (macOS)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "macos",
+            "program": "lib/main.dart"
+        }
+    ]
+}
