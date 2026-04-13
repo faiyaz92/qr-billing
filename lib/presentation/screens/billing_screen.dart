@@ -354,6 +354,43 @@ class _BillingScreenState extends State<BillingScreen> {
                                 );
                               },
                             ),
+                            const SizedBox(height: 8),
+                            // You Save
+                            Builder(
+                              builder: (context) {
+                                final subtotal = context.read<BillingCubit>().calculateTotal();
+                                final taxAmount = context.read<BillingCubit>().calculateTaxAmount();
+                                final originalTotal = state.cart.fold<double>(
+                                  0.0,
+                                  (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
+                                );
+                                final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
+                                final finalTotal = context.read<BillingCubit>().calculateFinalTotal();
+                                final youSave = originalTotalWithTax - finalTotal;
+                                
+                                return Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'You Save:',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                    Text(
+                                      '₹${youSave.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                             if (state.showProfitLossMode) ...[
                               const SizedBox(height: 8),
                               // Actual Profit/Loss after discount
@@ -691,13 +728,40 @@ class _BillingScreenState extends State<BillingScreen> {
                                                         Column(
                                                           crossAxisAlignment: CrossAxisAlignment.end,
                                                           children: [
+                                                            // MRP with strike through
                                                             Text(
-                                                              '₹${item.product.sellingPrice.toStringAsFixed(0)}',
+                                                              'MRP: ₹${(item.product.originalPrice ?? item.product.sellingPrice).toStringAsFixed(0)}',
+                                                              style: const TextStyle(
+                                                                fontSize: 12,
+                                                                color: Colors.grey,
+                                                                decoration: TextDecoration.lineThrough,
+                                                              ),
+                                                            ),
+                                                            // Effective Price
+                                                            Text(
+                                                              'Price: ₹${(item.product.sellingPrice - item.itemDiscount).toStringAsFixed(0)}',
                                                               style: const TextStyle(
                                                                 fontSize: 14,
                                                                 fontWeight: FontWeight.w500,
-                                                                color: Colors.grey,
+                                                                color: Colors.green,
                                                               ),
+                                                            ),
+                                                            // You Save
+                                                            Builder(
+                                                              builder: (context) {
+                                                                final originalPrice = item.product.originalPrice ?? item.product.sellingPrice;
+                                                                final effectivePrice = item.product.sellingPrice - item.itemDiscount;
+                                                                final savingsPerItem = originalPrice - effectivePrice;
+                                                                final totalSavings = savingsPerItem * item.quantity;
+                                                                return Text(
+                                                                  'You Save: ₹${totalSavings.toStringAsFixed(0)}',
+                                                                  style: const TextStyle(
+                                                                    fontSize: 12,
+                                                                    color: Colors.orange,
+                                                                    fontWeight: FontWeight.w500,
+                                                                  ),
+                                                                );
+                                                              },
                                                             ),
                                                             if (item.product.tax != null && item.product.tax! > 0) ...[
                                                               Text(

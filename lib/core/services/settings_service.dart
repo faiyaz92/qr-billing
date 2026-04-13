@@ -21,4 +21,14 @@ class SettingsServiceImpl implements ISettingsService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('store_secret');
   }
+
+  Future<void> saveStoreName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('store_name', name);
+  }
+
+  Future<String?> getStoreName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('store_name');
+  }
 }

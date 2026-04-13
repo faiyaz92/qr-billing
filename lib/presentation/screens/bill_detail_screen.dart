@@ -277,6 +277,82 @@ class BillDetailScreen extends StatelessWidget {
                       ),
                     ),
 
+                    // Summary Section
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Bill Summary',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E40AF),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (context.read<BillingCubit>().calculateTaxAmount() > 0)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Tax'),
+                                Text('₹${context.read<BillingCubit>().calculateTaxAmount().toStringAsFixed(2)}'),
+                              ],
+                            ),
+                          if (state.discount > 0)
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text('Discount'),
+                                Text('₹${state.discount.toStringAsFixed(2)}'),
+                              ],
+                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('You Save'),
+                              Text('₹${context.read<BillingCubit>().calculateYouSave().toStringAsFixed(2)}'),
+                            ],
+                          ),
+                          const Divider(),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Final Total',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1E40AF),
+                                ),
+                              ),
+                              Text(
+                                '₹${context.read<BillingCubit>().calculateFinalTotal().toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                     // Customer Details Section
                     Container(
                       margin: const EdgeInsets.only(bottom: 16),

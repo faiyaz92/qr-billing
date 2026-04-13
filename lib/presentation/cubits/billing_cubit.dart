@@ -4,6 +4,7 @@ import '../../core/services/i_print_service.dart';
 import '../../core/services/i_thermal_printer_service.dart';
 import '../../core/services/i_scan_service.dart';
 import '../../core/services/i_encryption_service.dart';
+import '../../core/services/i_settings_service.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../../data/models/scanned_data.dart';
@@ -56,6 +57,7 @@ class BillingCubit extends Cubit<BillingState> {
   final IPrintService _printService = getIt<IPrintService>();
   final IThermalPrinterService _thermalPrinterService = getIt<IThermalPrinterService>();
   final IEncryptionService _encryptionService = getIt<IEncryptionService>();
+  final ISettingsService _settingsService = getIt<ISettingsService>();
   List<CartItem> _cart = [];
   bool _showProfitLossMode = false; // Track profit/loss mode
   int? _currentBillId; // Track current bill ID for updates
@@ -267,12 +269,15 @@ class BillingCubit extends Cubit<BillingState> {
     
     // Save bill before printing (will update if already exists)
     await saveBill(currentState.discount);
+
+    // Get store name
+    final storeName = await _settingsService.getStoreName() ?? 'Store';
     
     // Check if thermal printer is connected
     if (_thermalPrinterService.isConnected) {
       // Use thermal printer
       final billData = StringBuffer();
-      billData.writeln('BILL|Bill Receipt|');
+      billData.writeln('BILL|$storeName|');
       billData.writeln('Customer: ${currentState.customerName ?? 'N/A'}');
       billData.writeln('Mobile: ${currentState.customerMobile ?? 'N/A'}');
       billData.writeln('Date: ${DateTime.now().toString().split(' ')[0]}');
@@ -304,17 +309,28 @@ class BillingCubit extends Cubit<BillingState> {
       }
       final finalTotal = calculateFinalTotal();
       billData.writeln('Final Total: ₹${finalTotal.toStringAsFixed(2)}');
+      
+      // Calculate You Save
+      final subtotal = calculateTotal();
+      final originalTotal = _cart.fold<double>(
+        0.0,
+        (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
+      );
+      final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
+      final youSave = originalTotalWithTax - finalTotal;
+      billData.writeln('You Save: ₹${youSave.toStringAsFixed(2)}');
+      
       billData.writeln(''); // Empty line for spacing
       billData.writeln(''); // Empty line for cutting
       billData.writeln(''); // Empty line for cutting
       billData.writeln(''); // Empty line for cutting
       
-      final payload = 'TEXT|Bill Receipt|${billData.toString()}';
+      final payload = 'TEXT|$storeName|${billData.toString()}';
       await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
     } else {
       // Fall back to system printer
       final billData = StringBuffer();
-      billData.writeln('Bill Receipt');
+      billData.writeln(storeName);
       billData.writeln('Customer: ${currentState.customerName ?? 'N/A'}');
       billData.writeln('Mobile: ${currentState.customerMobile ?? 'N/A'}');
       billData.writeln('Date: ${DateTime.now().toString().split(' ')[0]}');
@@ -346,18 +362,33 @@ class BillingCubit extends Cubit<BillingState> {
       }
       final finalTotal = calculateFinalTotal();
       billData.writeln('Final Total: ₹${finalTotal.toStringAsFixed(2)}');
+      
+      // Calculate You Save
+      final subtotal = calculateTotal();
+      final originalTotal = _cart.fold<double>(
+        0.0,
+        (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
+      );
+      final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
+      final youSave = originalTotalWithTax - finalTotal;
+      billData.writeln('You Save: ₹${youSave.toStringAsFixed(2)}');
+      
       billData.writeln(''); // Empty line for spacing
       billData.writeln(''); // Empty line for cutting
       billData.writeln(''); // Empty line for cutting
       billData.writeln(''); // Empty line for cutting
       
-      await _printService.printText(billData.toString(), 'Bill Receipt');
+      await _printService.printText(billData.toString(), storeName);
     }
   }
 
   Future<void> shareViaEmail(String email) async {
     final currentState = state as BillingUpdated;
     await saveBill(currentState.discount);
+
+    // Get store name
+    final storeName = await _settingsService.getStoreName() ?? 'Store';
+
     // Generate PDF
     final pdf = pw.Document();
     pdf.addPage(
@@ -491,6 +522,10 @@ class BillingCubit extends Cubit<BillingState> {
                           style: pw.TextStyle(fontSize: 14),
                         ),
                       pw.Text(
+                        'You Save: ₹${calculateYouSave().toStringAsFixed(2)}',
+                        style: pw.TextStyle(fontSize: 14),
+                      ),
+                      pw.Text(
                         'Final Total: ₹${calculateFinalTotal().toStringAsFixed(2)}',
                         style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
                       ),
@@ -512,14 +547,18 @@ class BillingCubit extends Cubit<BillingState> {
     // Share via Email - opens share dialog with email apps
     await Share.shareXFiles(
       [XFile(file.path)],
-      text: 'Bill Receipt for $email',
-      subject: 'Bill Receipt',
+      text: '$storeName bill for $email',
+      subject: '$storeName Bill',
     );
   }
 
   Future<void> shareViaWhatsApp(String mobile) async {
     final currentState = state as BillingUpdated;
     await saveBill(currentState.discount);
+
+    // Get store name
+    final storeName = await _settingsService.getStoreName() ?? 'Store';
+
     // Generate PDF
     final pdf = pw.Document();
     pdf.addPage(
@@ -527,7 +566,7 @@ class BillingCubit extends Cubit<BillingState> {
         build: (pw.Context context) {
           return pw.Column(
             children: [
-              pw.Text('Bill Receipt', style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.Text(storeName, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 20),
               ..._cart.map((item) {
                 return pw.Row(
@@ -541,6 +580,7 @@ class BillingCubit extends Cubit<BillingState> {
               pw.Divider(),
               if (calculateTaxAmount() > 0) pw.Text('Tax: ${calculateTaxAmount().toStringAsFixed(2)}'),
               if (currentState.discount > 0) pw.Text('Discount: ${currentState.discount.toStringAsFixed(2)}'),
+              pw.Text('You Save: ${calculateYouSave().toStringAsFixed(2)}'),
               pw.Text('Total: ${calculateFinalTotal().toStringAsFixed(2)}'),
             ],
           );
@@ -560,7 +600,7 @@ class BillingCubit extends Cubit<BillingState> {
       // Note: Sharing file via WhatsApp URL is limited; user can attach manually or use share_plus with WhatsApp
     } else {
       // Fallback to general share
-      await Share.shareXFiles([XFile(file.path)], text: 'Bill Receipt for $mobile');
+      await Share.shareXFiles([XFile(file.path)], text: '$storeName bill for $mobile');
     }
   }
 
@@ -636,6 +676,12 @@ class BillingCubit extends Cubit<BillingState> {
     return subtotal + taxAmount - currentState.discount;
   }
 
+  double calculateYouSave() {
+    final originalTotal = _cart.fold(0.0, (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity));
+    final taxAmount = calculateTaxAmount();
+    return originalTotal + taxAmount - calculateFinalTotal();
+  }
+
   // Temporary method for testing in emulator - adds dummy products to cart
   void addDummyProductsForTesting() {
     _currentBillId = null; // Reset bill ID for new cart
@@ -707,6 +753,9 @@ class BillingCubit extends Cubit<BillingState> {
 
     // Save bill before sharing (will update if already exists)
     await saveBill(currentState.discount);
+
+    // Get store name
+    final storeName = await _settingsService.getStoreName() ?? 'Store';
 
     // Generate PDF with actual bill data
     final pdf = pw.Document();
@@ -841,6 +890,10 @@ class BillingCubit extends Cubit<BillingState> {
                           'Discount: ₹${currentState.discount.toStringAsFixed(2)}',
                           style: pw.TextStyle(fontSize: 14),
                         ),
+                      pw.Text(
+                        'You Save: ₹${calculateYouSave().toStringAsFixed(2)}',
+                        style: pw.TextStyle(fontSize: 14),
+                      ),
                       pw.Text(
                         'Final Total: ₹${calculateFinalTotal().toStringAsFixed(2)}',
                         style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),

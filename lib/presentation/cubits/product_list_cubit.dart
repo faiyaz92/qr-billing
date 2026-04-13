@@ -4,6 +4,7 @@ import '../../core/injection.dart';
 import '../../domain/repositories/i_product_repository.dart';
 import '../../core/services/i_print_service.dart';
 import '../../core/services/i_thermal_printer_service.dart';
+import '../../core/services/i_settings_service.dart';
 import '../../data/models/product.dart';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -12,6 +13,7 @@ class ProductListCubit extends Cubit<ProductListState> {
   final IProductRepository _productRepo = getIt<IProductRepository>();
   final IPrintService _printService = getIt<IPrintService>();
   final IThermalPrinterService _thermalPrinterService = getIt<IThermalPrinterService>();
+  final ISettingsService _settingsService = getIt<ISettingsService>();
   List<Product> _products = [];
   bool _showQr = false;
   bool _showBarcode = false;
@@ -40,8 +42,25 @@ class ProductListCubit extends Cubit<ProductListState> {
       final data = product.qrData ?? 'No QR data';
       final title = product.name ?? 'Product';
 
+      // Get store name
+      final storeName = await _settingsService.getStoreName() ?? 'Store';
+
+      // Format prices
+      final sellingPrice = product.sellingPrice ?? 0.0;
+      final originalPrice = product.originalPrice ?? sellingPrice;
+
+      final payload = '''
+$storeName
+$title
+
+Price: ₹${sellingPrice.toStringAsFixed(2)}
+MRP: ₹${originalPrice.toStringAsFixed(2)}
+
+$data
+
+''';
+
       if (_thermalPrinterService.isConnected) {
-        final payload = 'QR|$title|$data\n\n\n\n';
         await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
       } else {
         await _printService.printQRCode(data, title);

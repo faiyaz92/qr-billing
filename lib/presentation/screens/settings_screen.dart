@@ -16,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _pinController = TextEditingController();
   final _storeSecretController = TextEditingController();
+  final _storeNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   @override
@@ -29,6 +30,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _pinController.dispose();
     _storeSecretController.dispose();
+    _storeNameController.dispose();
     super.dispose();
   }
 
@@ -46,6 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Update controllers with loaded values
             _pinController.text = state.pin ?? '';
             _storeSecretController.text = state.storeSecret ?? '';
+            _storeNameController.text = state.storeName ?? '';
           } else if (state is SettingsSaved) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Settings saved successfully!')),
@@ -210,7 +213,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
 
-                  // Thermal Printer Settings
+                  // Store Name Field
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.store, color: Colors.purple.shade700, size: 24),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Store Name',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          TextFormField(
+                            controller: _storeNameController,
+                            decoration: InputDecoration(
+                              labelText: 'Enter store name',
+                              hintText: 'My Store',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              prefixIcon: const Icon(Icons.store),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Store name is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
                   Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
@@ -302,6 +352,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context.read<SettingsCubit>().saveSettings(
         pin: _pinController.text.trim(),
         storeSecret: _storeSecretController.text.trim(),
+        storeName: _storeNameController.text.trim(),
       );
     }
   }

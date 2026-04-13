@@ -33,6 +33,6 @@ void setupDependencies() {
   getIt.registerSingleton<IBillRepository>(BillRepositoryImpl());
   getIt.registerFactory<SettingsCubit>(() => SettingsCubit(getIt<ISettingsService>()));
   getIt.registerFactory<AnalyticsCubit>(() => AnalyticsCubit(getIt<IBillRepository>(), getIt<IProductRepository>()));
-  getIt.registerFactory<DailySalesCubit>(() => DailySalesCubit(getIt<IBillRepository>()));
+  getIt.registerFactory<DailySalesCubit>(() => DailySalesCubit(getIt<IBillRepository>(), getIt<ISettingsService>()));
   getIt.registerFactory<AddProductCubit>(() => AddProductCubit());
 }

@@ -7,8 +7,9 @@ class SettingsLoading extends SettingsState {}
 class SettingsLoaded extends SettingsState {
   final String? pin;
   final String? storeSecret;
+  final String? storeName;
 
-  SettingsLoaded({this.pin, this.storeSecret});
+  SettingsLoaded({this.pin, this.storeSecret, this.storeName});
 }
 
 class SettingsSaved extends SettingsState {}

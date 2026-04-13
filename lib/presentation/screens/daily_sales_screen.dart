@@ -11,6 +11,10 @@ import '../cubits/billing_cubit.dart';
 class DailySalesScreen extends StatelessWidget {
   const DailySalesScreen({super.key});
 
+  bool _shouldRebuild(DailySalesState state) {
+    return state is! DailySalesViewBill && state is! DailySalesEditBill;
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
@@ -46,6 +50,7 @@ class DailySalesScreen extends StatelessWidget {
               children: [
                 // Monthly Summary Tiles
                 BlocBuilder<DailySalesCubit, DailySalesState>(
+                  buildWhen: (previous, current) => _shouldRebuild(current),
                   builder: (context, state) {
                     if (state is DailySalesLoaded) {
                       return Container(
@@ -101,6 +106,7 @@ class DailySalesScreen extends StatelessWidget {
                         children: [
                           Expanded(
                             child: BlocBuilder<DailySalesCubit, DailySalesState>(
+                              buildWhen: (previous, current) => _shouldRebuild(current),
                               builder: (context, state) {
                                 final selectedMonth = (state is DailySalesLoaded) ? state.selectedMonth : DateTime.now().month;
                                 return DropdownButtonFormField<int>(
@@ -122,6 +128,7 @@ class DailySalesScreen extends StatelessWidget {
                           const SizedBox(width: 12),
                           Expanded(
                             child: BlocBuilder<DailySalesCubit, DailySalesState>(
+                              buildWhen: (previous, current) => _shouldRebuild(current),
                               builder: (context, state) {
                                 final selectedYear = (state is DailySalesLoaded) ? state.selectedYear : DateTime.now().year;
                                 return DropdownButtonFormField<int>(
@@ -144,6 +151,7 @@ class DailySalesScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       BlocBuilder<DailySalesCubit, DailySalesState>(
+                        buildWhen: (previous, current) => _shouldRebuild(current),
                         builder: (context, state) {
                           final searchQuery = (state is DailySalesLoaded) ? state.searchQuery : '';
                           return TextField(
@@ -163,6 +171,7 @@ class DailySalesScreen extends StatelessWidget {
                 ),
               Expanded(
                 child: BlocBuilder<DailySalesCubit, DailySalesState>(
+                  buildWhen: (previous, current) => _shouldRebuild(current),
                   builder: (context, state) {
                     if (state is DailySalesLoading) {
                       return const Center(child: CircularProgressIndicator());

@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/i_bill_repository.dart';
+import '../../core/services/i_settings_service.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/bill_item.dart';
 import 'daily_sales_state.dart';
@@ -11,11 +12,12 @@ import 'package:pdf/pdf.dart';
 
 class DailySalesCubit extends Cubit<DailySalesState> {
   final IBillRepository _billRepository;
+  final ISettingsService _settingsService;
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   String _searchQuery = '';
 
-  DailySalesCubit(this._billRepository) : super(DailySalesInitial()) {
+  DailySalesCubit(this._billRepository, this._settingsService) : super(DailySalesInitial()) {
     loadSales();
   }
 
@@ -155,6 +157,9 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       // Get bill items
       final billItems = await _billRepository.getBillItems(billId);
 
+      // Get store name
+      final storeName = await _settingsService.getStoreName() ?? 'Store';
+
       // Generate PDF
       final pdf = pw.Document();
 
@@ -170,7 +175,7 @@ class DailySalesCubit extends Cubit<DailySalesState> {
                   // Header
                   pw.Center(
                     child: pw.Text(
-                      'BILL RECEIPT',
+                      storeName,
                       style: pw.TextStyle(
                         fontSize: 24,
                         fontWeight: pw.FontWeight.bold,
@@ -308,8 +313,8 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       // Share the PDF file
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: 'Bill Receipt - ${bill.customerName ?? 'Customer'}',
-        subject: 'Bill Receipt',
+        text: '$storeName bill - ${bill.customerName ?? 'Customer'}',
+        subject: '$storeName Bill',
       );
     } catch (e) {
       throw Exception('Failed to share bill PDF: $e');
