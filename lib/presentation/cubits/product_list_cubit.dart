@@ -49,16 +49,7 @@ class ProductListCubit extends Cubit<ProductListState> {
       final sellingPrice = product.sellingPrice ?? 0.0;
       final originalPrice = product.originalPrice ?? sellingPrice;
 
-      final payload = '''
-$storeName
-$title
-
-Price: ₹${sellingPrice.toStringAsFixed(2)}
-MRP: ₹${originalPrice.toStringAsFixed(2)}
-
-$data
-
-''';
+      final payload = 'QR|$title|$data';
 
       if (_thermalPrinterService.isConnected) {
         await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
