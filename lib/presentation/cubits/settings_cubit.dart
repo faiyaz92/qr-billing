@@ -13,18 +13,22 @@ class SettingsCubit extends Cubit<SettingsState> {
       final pin = await _settingsService.getPin();
       final storeSecret = await _settingsService.getStoreSecret();
       final storeName = await _settingsService.getStoreName();
-      emit(SettingsLoaded(pin: pin, storeSecret: storeSecret, storeName: storeName));
+      final printerPreference = await _settingsService.getPrinterPreference();
+      emit(SettingsLoaded(pin: pin, storeSecret: storeSecret, storeName: storeName, printerPreference: printerPreference));
     } catch (e) {
       emit(SettingsError('Failed to load settings: ${e.toString()}'));
     }
   }
 
-  Future<void> saveSettings({required String pin, required String storeSecret, required String storeName}) async {
+  Future<void> saveSettings({required String pin, required String storeSecret, required String storeName, String? printerPreference}) async {
     emit(SettingsLoading());
     try {
       await _settingsService.savePin(pin);
       await _settingsService.saveStoreSecret(storeSecret);
       await _settingsService.saveStoreName(storeName);
+      if (printerPreference != null) {
+        await _settingsService.savePrinterPreference(printerPreference);
+      }
       emit(SettingsSaved());
       // Reload settings to confirm they were saved
       await loadSettings();

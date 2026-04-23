@@ -8,8 +8,9 @@ class SettingsLoaded extends SettingsState {
   final String? pin;
   final String? storeSecret;
   final String? storeName;
+  final String printerPreference;
 
-  SettingsLoaded({this.pin, this.storeSecret, this.storeName});
+  SettingsLoaded({this.pin, this.storeSecret, this.storeName, this.printerPreference = 'bluetooth'});
 }
 
 class SettingsSaved extends SettingsState {}

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_based_billing/app_router.dart';
+import '../../core/injection.dart';
 import '../cubits/home_cubit.dart';
 import '../cubits/home_state.dart';
 import '../cubits/quick_scan_cubit.dart';
@@ -30,7 +31,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => BlocProvider(
-        create: (context) => QuickScanCubit(),
+        create: (context) => getIt<QuickScanCubit>(),
         child: AlertDialog(
           title: const Text('Quick Scan Product'),
           content: SizedBox(
@@ -90,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => HomeCubit()..loadHome(),
+      create: (context) => getIt<HomeCubit>()..loadHome(),
       child: BlocBuilder<HomeCubit, HomeState>(
         buildWhen: (previous, current) => current is HomeLoaded,
         builder: (context, state) {

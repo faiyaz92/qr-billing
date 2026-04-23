@@ -1,24 +1,20 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'product_list_state.dart';
-import '../../core/injection.dart';
 import '../../domain/repositories/i_product_repository.dart';
-import '../../core/services/i_print_service.dart';
-import '../../core/services/i_thermal_printer_service.dart';
+import '../../core/services/print_manager.dart';
 import '../../core/services/i_settings_service.dart';
 import '../../data/models/product.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 
 class ProductListCubit extends Cubit<ProductListState> {
-  final IProductRepository _productRepo = getIt<IProductRepository>();
-  final IPrintService _printService = getIt<IPrintService>();
-  final IThermalPrinterService _thermalPrinterService = getIt<IThermalPrinterService>();
-  final ISettingsService _settingsService = getIt<ISettingsService>();
+  final IProductRepository _productRepo;
+  final PrintManager _printManager;
   List<Product> _products = [];
   bool _showQr = false;
   bool _showBarcode = false;
 
-  ProductListCubit() : super(ProductListInitial()) {
+  ProductListCubit(this._productRepo, this._printManager) : super(ProductListInitial()) {
     loadProducts();
   }
 
@@ -37,25 +33,21 @@ class ProductListCubit extends Cubit<ProductListState> {
     emit(ProductListLoaded(_products, showQr: _showQr, showBarcode: _showBarcode));
   }
 
+  void searchProducts(String query) {
+    if (query.isEmpty) {
+      emit(ProductListLoaded(_products, showQr: _showQr, showBarcode: _showBarcode));
+    } else {
+      final filteredProducts = _products.where((product) =>
+        (product.name?.toLowerCase().contains(query.toLowerCase()) ?? false) ||
+        (product.brand?.toLowerCase().contains(query.toLowerCase()) ?? false)
+      ).toList();
+      emit(ProductListLoaded(filteredProducts, showQr: _showQr, showBarcode: _showBarcode));
+    }
+  }
+
   Future<void> printQRCode(Product product) async {
     try {
-      final data = product.qrData ?? 'No QR data';
-      final title = product.name ?? 'Product';
-
-      // Get store name
-      final storeName = await _settingsService.getStoreName() ?? 'Store';
-
-      // Format prices
-      final sellingPrice = product.sellingPrice ?? 0.0;
-      final originalPrice = product.originalPrice ?? sellingPrice;
-
-      final payload = 'QR|$title|$data';
-
-      if (_thermalPrinterService.isConnected) {
-        await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
-      } else {
-        await _printService.printQRCode(data, title);
-      }
+      await _printManager.printProductQR(product);
     } catch (e) {
       throw Exception('Print failed: $e');
     }
@@ -63,15 +55,7 @@ class ProductListCubit extends Cubit<ProductListState> {
 
   Future<void> printBarcode(Product product) async {
     try {
-      final data = product.qrData ?? 'No data';
-      final title = product.name ?? 'Product';
-
-      if (_thermalPrinterService.isConnected) {
-        final payload = 'BARCODE|$title|$data\n\n\n\n';
-        await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
-      } else {
-        await _printService.printBarcode(data, title);
-      }
+      await _printManager.printProductBarcode(product);
     } catch (e) {
       throw Exception('Print failed: $e');
     }

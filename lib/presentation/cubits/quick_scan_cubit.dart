@@ -1,5 +1,4 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/injection.dart';
 import '../../core/services/i_scan_service.dart';
 import '../../data/models/scanned_data.dart';
 
@@ -20,9 +19,9 @@ class QuickScanError extends QuickScanState {
 }
 
 class QuickScanCubit extends Cubit<QuickScanState> {
-  final IScanService _scanService = getIt<IScanService>();
+  final IScanService _scanService;
 
-  QuickScanCubit() : super(QuickScanInitial());
+  QuickScanCubit(this._scanService) : super(QuickScanInitial());
 
   Future<void> quickScanProduct(String qrCode) async {
     emit(QuickScanLoading());

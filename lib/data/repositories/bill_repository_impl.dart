@@ -10,6 +10,9 @@ class BillRepositoryImpl implements IBillRepository {
   Future<int> insertBill(Bill bill) => _dbHelper.insertBill(bill);
 
   @override
+  Future<int> updateBill(Bill bill) => _dbHelper.updateBill(bill);
+
+  @override
   Future<List<Bill>> getBillsByDate(String date) => _dbHelper.getBillsByDate(date);
 
   @override
@@ -20,6 +23,9 @@ class BillRepositoryImpl implements IBillRepository {
 
   @override
   Future<int> insertBillItem(BillItem item) => _dbHelper.insertBillItem(item);
+
+  @override
+  Future<int> deleteBillItems(int billId) => _dbHelper.deleteBillItems(billId);
 
   @override
   Future<List<BillItem>> getBillItems(int billId) => _dbHelper.getBillItems(billId);

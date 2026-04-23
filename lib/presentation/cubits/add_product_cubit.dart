@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'add_product_state.dart';
-import '../../core/injection.dart';
 import '../../domain/repositories/i_product_repository.dart';
 import '../../data/models/product.dart';
 import '../../core/services/i_qr_generator_service.dart';
@@ -8,11 +7,11 @@ import '../../core/services/i_encryption_service.dart';
 import 'dart:convert';
 
 class AddProductCubit extends Cubit<AddProductState> {
-  final IProductRepository _productRepo = getIt<IProductRepository>();
-  final IQrGeneratorService _qrGenerator = getIt<IQrGeneratorService>();
-  final IEncryptionService _encryption = getIt<IEncryptionService>();
+  final IProductRepository _productRepo;
+  final IQrGeneratorService _qrGenerator;
+  final IEncryptionService _encryption;
 
-  AddProductCubit() : super(AddProductInitial());
+  AddProductCubit(this._productRepo, this._qrGenerator, this._encryption) : super(AddProductInitial());
 
   Future<void> addProduct(Map<String, dynamic> data) async {
     emit(AddProductLoading());

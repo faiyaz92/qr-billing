@@ -1,14 +1,12 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/injection.dart';
-import '../../core/services/i_print_service.dart';
-import '../../core/services/i_thermal_printer_service.dart';
+import '../../core/services/print_manager.dart';
 import '../../core/services/i_scan_service.dart';
 import '../../core/services/i_encryption_service.dart';
 import '../../core/services/i_settings_service.dart';
+import '../../domain/repositories/i_bill_repository.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import '../../data/models/scanned_data.dart';
-import '../../data/database_helper.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/bill_item.dart';
 import '../../data/models/product.dart';
@@ -53,17 +51,28 @@ class BillingError extends BillingState {
 }
 
 class BillingCubit extends Cubit<BillingState> {
-  final IScanService _scanService = getIt<IScanService>();
-  final IPrintService _printService = getIt<IPrintService>();
-  final IThermalPrinterService _thermalPrinterService = getIt<IThermalPrinterService>();
-  final IEncryptionService _encryptionService = getIt<IEncryptionService>();
-  final ISettingsService _settingsService = getIt<ISettingsService>();
+  final IScanService _scanService;
+  final PrintManager _printManager;
+  final IEncryptionService _encryptionService;
+  final ISettingsService _settingsService;
+  final IBillRepository _billRepository;
   List<CartItem> _cart = [];
   bool _showProfitLossMode = false; // Track profit/loss mode
   int? _currentBillId; // Track current bill ID for updates
   bool _isEditMode = false; // Track if we're in edit mode
 
-  BillingCubit() : super(BillingUpdated([], showProfitLossMode: false, isEditMode: false, taxRate: 0.0));
+  BillingCubit({
+    required IScanService scanService,
+    required PrintManager printManager,
+    required IEncryptionService encryptionService,
+    required ISettingsService settingsService,
+    required IBillRepository billRepository,
+  }) : _scanService = scanService,
+       _printManager = printManager,
+       _encryptionService = encryptionService,
+       _settingsService = settingsService,
+       _billRepository = billRepository,
+       super(BillingUpdated([], showProfitLossMode: false, isEditMode: false, taxRate: 0.0));
 
   void toggleProfitLossMode() {
     _showProfitLossMode = !_showProfitLossMode;
@@ -77,6 +86,56 @@ class BillingCubit extends Cubit<BillingState> {
       taxRate: currentState.taxRate,
       duplicateDetected: currentState.duplicateDetected,
       duplicateProductName: currentState.duplicateProductName,
+      showProfitLossMode: _showProfitLossMode,
+      isEditMode: _isEditMode,
+    ));
+  }
+
+  void addProductToCart({
+    required Product product,
+    required ScannedData scannedData,
+    int quantity = 1,
+  }) {
+    if (quantity <= 0) return;
+
+    final existingIndex = _cart.indexWhere((item) {
+      final newQr = scannedData.qrCode;
+      final oldQr = item.data.qrCode;
+      if (newQr.isNotEmpty && oldQr.isNotEmpty) {
+        return oldQr == newQr;
+      }
+      return item.product.name == product.name && item.product.brand == product.brand;
+    });
+
+    if (existingIndex == -1) {
+      _cart.add(CartItem(
+        data: scannedData,
+        product: product,
+        quantity: quantity,
+      ));
+    } else {
+      _cart[existingIndex].quantity += quantity;
+    }
+
+    final currentState = state;
+    if (currentState is BillingUpdated) {
+      emit(BillingUpdated(
+        List.from(_cart),
+        isScanningPaused: currentState.isScanningPaused,
+        customerMobile: currentState.customerMobile,
+        customerName: currentState.customerName,
+        discount: currentState.discount,
+        taxRate: currentState.taxRate,
+        duplicateDetected: false,
+        duplicateProductName: null,
+        showProfitLossMode: _showProfitLossMode,
+        isEditMode: _isEditMode,
+      ));
+      return;
+    }
+
+    emit(BillingUpdated(
+      List.from(_cart),
       showProfitLossMode: _showProfitLossMode,
       isEditMode: _isEditMode,
     ));
@@ -187,13 +246,12 @@ class BillingCubit extends Cubit<BillingState> {
 
   Future<void> saveBill(double discount) async {
     final currentState = state as BillingUpdated;
-    final db = DatabaseHelper();
     final total = calculateTotal();
     final finalTotal = total - discount;
-    
+
     // Calculate total purchase amount for profit tracking
     final purchaseAmount = _cart.fold(0.0, (sum, item) => sum + (item.product.purchasePrice * item.quantity));
-    
+
     final bill = Bill(
       id: _currentBillId, // Use existing ID if updating
       date: DateTime.now().toIso8601String().split('T')[0], // YYYY-MM-DD
@@ -204,21 +262,19 @@ class BillingCubit extends Cubit<BillingState> {
       customerName: currentState.customerName,
       customerMobile: currentState.customerMobile,
     );
-    
+
     int billId;
     if (_currentBillId != null) {
-      // Update existing bill
-      await db.updateBill(bill);
+      // Update existing bill and replace all existing bill items
       billId = _currentBillId!;
-      
-      // Delete existing bill items and re-insert (simpler than updating each one)
-      await db.deleteBillItems(billId);
+      await _billRepository.updateBill(bill);
+      await _billRepository.deleteBillItems(billId);
     } else {
       // Insert new bill
-      billId = await db.insertBill(bill);
+      billId = await _billRepository.insertBill(bill);
       _currentBillId = billId; // Store the bill ID for future updates
     }
-    
+
     // Save individual bill items with prices for profit tracking
     for (final item in _cart) {
       final billItem = BillItem(
@@ -231,9 +287,9 @@ class BillingCubit extends Cubit<BillingState> {
         sellingPrice: item.product.sellingPrice,
         taxRate: item.product.tax ?? 0.0,
       );
-      await db.insertBillItem(billItem);
+      await _billRepository.insertBillItem(billItem);
     }
-    
+
     // Don't clear cart here - only clear when starting new bill
   }
 
@@ -266,120 +322,56 @@ class BillingCubit extends Cubit<BillingState> {
 
   Future<void> printBill() async {
     final currentState = state as BillingUpdated;
-    
+
     // Save bill before printing (will update if already exists)
     await saveBill(currentState.discount);
 
     // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
-    
-    // Check if thermal printer is connected
-    if (_thermalPrinterService.isConnected) {
-      // Use thermal printer
-      final billData = StringBuffer();
-      billData.writeln('BILL|$storeName|');
-      billData.writeln('Customer: ${currentState.customerName ?? 'N/A'}');
-      billData.writeln('Mobile: ${currentState.customerMobile ?? 'N/A'}');
-      billData.writeln('Date: ${DateTime.now().toString().split(' ')[0]}');
-      billData.writeln('--- Items ---');
-      
-      for (final item in _cart) {
-        final itemTotal = (item.product.sellingPrice - item.itemDiscount) * item.quantity;
-        billData.writeln('${item.product.name} x${item.quantity} = ₹${itemTotal.toStringAsFixed(2)}');
-        if (item.itemDiscount > 0) {
-          billData.writeln('  (Discount: ₹${(item.itemDiscount * item.quantity).toStringAsFixed(2)})');
-        }
-      }
-      
-      billData.writeln('--- Summary ---');
-      billData.writeln('Subtotal: ₹${calculateTotal().toStringAsFixed(2)}');
-      
-      // Calculate and show total item discounts
-      final totalItemDiscounts = _cart.fold<double>(0.0, (sum, item) => sum + (item.itemDiscount * item.quantity));
-      if (totalItemDiscounts > 0) {
-        billData.writeln('Item Discounts: ₹${totalItemDiscounts.toStringAsFixed(2)}');
-      }
-      
-      final taxAmount = calculateTaxAmount();
-      if (taxAmount > 0) {
-        billData.writeln('Tax: ₹${taxAmount.toStringAsFixed(2)}');
-      }
-      if (currentState.discount > 0) {
-        billData.writeln('Additional Discount: ₹${currentState.discount.toStringAsFixed(2)}');
-      }
-      final finalTotal = calculateFinalTotal();
-      billData.writeln('Final Total: ₹${finalTotal.toStringAsFixed(2)}');
-      
-      // Calculate You Save
-      final subtotal = calculateTotal();
-      final originalTotal = _cart.fold<double>(
-        0.0,
-        (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
-      );
-      final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
-      final youSave = originalTotalWithTax - finalTotal;
-      billData.writeln('You Save: ₹${youSave.toStringAsFixed(2)}');
-      
-      billData.writeln(''); // Empty line for spacing
-      billData.writeln(''); // Empty line for cutting
-      billData.writeln(''); // Empty line for cutting
-      billData.writeln(''); // Empty line for cutting
-      
-      final payload = 'TEXT|$storeName|${billData.toString()}';
-      await _thermalPrinterService.printReceipt(Uint8List.fromList(utf8.encode(payload)));
-    } else {
-      // Fall back to system printer
-      final billData = StringBuffer();
-      billData.writeln(storeName);
-      billData.writeln('Customer: ${currentState.customerName ?? 'N/A'}');
-      billData.writeln('Mobile: ${currentState.customerMobile ?? 'N/A'}');
-      billData.writeln('Date: ${DateTime.now().toString().split(' ')[0]}');
-      billData.writeln('--- Items ---');
-      
-      for (final item in _cart) {
-        final itemTotal = (item.product.sellingPrice - item.itemDiscount) * item.quantity;
-        billData.writeln('${item.product.name} x${item.quantity} = ₹${itemTotal.toStringAsFixed(2)}');
-        if (item.itemDiscount > 0) {
-          billData.writeln('  (Discount: ₹${(item.itemDiscount * item.quantity).toStringAsFixed(2)})');
-        }
-      }
-      
-      billData.writeln('--- Summary ---');
-      billData.writeln('Subtotal: ₹${calculateTotal().toStringAsFixed(2)}');
-      
-      // Calculate and show total item discounts
-      final totalItemDiscounts = _cart.fold<double>(0.0, (sum, item) => sum + (item.itemDiscount * item.quantity));
-      if (totalItemDiscounts > 0) {
-        billData.writeln('Item Discounts: ₹${totalItemDiscounts.toStringAsFixed(2)}');
-      }
-      
-      final taxAmount = calculateTaxAmount();
-      if (taxAmount > 0) {
-        billData.writeln('Tax: ₹${taxAmount.toStringAsFixed(2)}');
-      }
-      if (currentState.discount > 0) {
-        billData.writeln('Additional Discount: ₹${currentState.discount.toStringAsFixed(2)}');
-      }
-      final finalTotal = calculateFinalTotal();
-      billData.writeln('Final Total: ₹${finalTotal.toStringAsFixed(2)}');
-      
-      // Calculate You Save
-      final subtotal = calculateTotal();
-      final originalTotal = _cart.fold<double>(
-        0.0,
-        (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
-      );
-      final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
-      final youSave = originalTotalWithTax - finalTotal;
-      billData.writeln('You Save: ₹${youSave.toStringAsFixed(2)}');
-      
-      billData.writeln(''); // Empty line for spacing
-      billData.writeln(''); // Empty line for cutting
-      billData.writeln(''); // Empty line for cutting
-      billData.writeln(''); // Empty line for cutting
-      
-      await _printService.printText(billData.toString(), storeName);
-    }
+
+    // Prepare bill data for PrintManager
+    final items = _cart.map((item) {
+      final itemTotal = (item.product.sellingPrice - item.itemDiscount) * item.quantity;
+      return {
+        'name': item.product.name,
+        'quantity': item.quantity,
+        'total': itemTotal,
+        'discount': item.itemDiscount,
+      };
+    }).toList();
+
+    // Calculate summary data
+    final subtotal = calculateTotal();
+    final totalItemDiscounts = _cart.fold<double>(0.0, (sum, item) => sum + (item.itemDiscount * item.quantity));
+    final taxAmount = calculateTaxAmount();
+    final finalTotal = calculateFinalTotal();
+
+    // Calculate You Save
+    final originalTotal = _cart.fold<double>(
+      0.0,
+      (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
+    );
+    final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
+    final youSave = originalTotalWithTax - finalTotal;
+
+    final summary = {
+      'subtotal': subtotal,
+      'totalItemDiscounts': totalItemDiscounts,
+      'taxAmount': taxAmount,
+      'discount': currentState.discount,
+      'finalTotal': finalTotal,
+      'youSave': youSave,
+    };
+
+    // Use PrintManager for centralized printing
+    await _printManager.printBill(
+      storeName: storeName,
+      customerName: currentState.customerName ?? 'N/A',
+      customerMobile: currentState.customerMobile ?? 'N/A',
+      date: DateTime.now().toString().split(' ')[0],
+      items: items,
+      summary: summary,
+    );
   }
 
   Future<void> shareViaEmail(String email) async {
@@ -606,9 +598,14 @@ class BillingCubit extends Cubit<BillingState> {
 
   Future<void> loadBillForView(int billId) async {
     print('Loading bill for view: $billId');
-    final db = DatabaseHelper();
-    final items = await db.getBillItems(billId);
-    final bill = await db.getAllBills().then((bills) => bills.firstWhere((b) => b.id == billId));
+    final items = await _billRepository.getBillItems(billId);
+    final bill = await _billRepository.getBillById(billId);
+    
+    if (bill == null) {
+      emit(BillingError('Bill not found'));
+      return;
+    }
+    
     print('Bill data: discount=${bill.discount}, totalAmount=${bill.totalAmount}');
     
     // Clear cart

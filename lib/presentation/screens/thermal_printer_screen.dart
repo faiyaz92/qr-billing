@@ -3,6 +3,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:bluetooth_print/bluetooth_print_model.dart';
 import '../../core/services/i_thermal_printer_service.dart';
 
 @RoutePage()
@@ -189,7 +190,15 @@ class _ThermalPrinterScreenState extends State<ThermalPrinterScreen> {
 
     try {
       // Create sample receipt data
-      final success = await _printerService.printReceipt(Uint8List(0));
+      final testData = [
+        LineText(
+          type: LineText.TYPE_TEXT,
+          content: 'Test Print',
+          align: LineText.ALIGN_CENTER,
+        ),
+        LineText(linefeed: 2),
+      ];
+      final success = await _printerService.printReceipt(testData);
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Test print sent successfully')),

@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_based_billing/app_router.dart';
+import '../../core/injection.dart';
 import '../cubits/splash_cubit.dart';
 import '../cubits/splash_state.dart';
 
@@ -12,7 +13,7 @@ class SplashScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => SplashCubit()..completeSplash(),
+      create: (context) => getIt<SplashCubit>()..completeSplash(),
       child: BlocBuilder<SplashCubit, SplashState>(
         buildWhen: (previous, current) => current is SplashCompleted,
         builder: (context, state) {

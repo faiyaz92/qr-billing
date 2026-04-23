@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => getIt<SettingsCubit>()),
-        BlocProvider(create: (_) => BillingCubit()),
+        BlocProvider(create: (_) => getIt<BillingCubit>()), // ✅ अब getIt से मिलेगा
       ],
       child: MaterialApp.router(
         title: 'QR-Based Billing',

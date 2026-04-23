@@ -31,4 +31,14 @@ class SettingsServiceImpl implements ISettingsService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('store_name');
   }
+
+  Future<void> savePrinterPreference(String preference) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('printer_preference', preference);
+  }
+
+  Future<String> getPrinterPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('printer_preference') ?? 'bluetooth'; // Default to bluetooth
+  }
 }

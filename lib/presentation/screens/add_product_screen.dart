@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:barcode_widget/barcode_widget.dart';
+import '../../core/injection.dart';
 import '../cubits/add_product_cubit.dart';
 import '../cubits/add_product_state.dart';
 
@@ -13,7 +14,7 @@ class AddProductScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AddProductCubit(),
+      create: (_) => getIt<AddProductCubit>(),
       child: Scaffold(
         body: Column(
           children: [

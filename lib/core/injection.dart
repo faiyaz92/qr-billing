@@ -6,6 +6,7 @@ import 'services/print_service.dart';
 import 'services/i_thermal_printer_service.dart';
 import 'services/thermal_printer_service.dart';
 import 'services/i_settings_service.dart';
+import 'services/print_manager.dart';
 import 'services/settings_service.dart';
 import 'services/i_scan_service.dart';
 import 'services/scan_service.dart';
@@ -19,20 +20,44 @@ import '../presentation/cubits/settings_cubit.dart';
 import '../presentation/cubits/analytics_cubit.dart';
 import '../presentation/cubits/daily_sales_cubit.dart';
 import '../presentation/cubits/add_product_cubit.dart';
+import '../presentation/cubits/quick_scan_cubit.dart';
+import '../presentation/cubits/product_list_cubit.dart';
+import '../presentation/cubits/home_cubit.dart';
+import '../presentation/cubits/splash_cubit.dart';
+import '../presentation/cubits/billing_cubit.dart';
 
 final getIt = GetIt.instance;
 
 void setupDependencies() {
+  // Services
   getIt.registerSingleton<ISettingsService>(SettingsServiceImpl());
   getIt.registerSingleton<IEncryptionService>(EncryptionServiceImpl());
   getIt.registerSingleton<IPrintService>(PrintServiceImpl());
   getIt.registerLazySingleton<IThermalPrinterService>(() => ThermalPrinterServiceImpl());
+  getIt.registerSingleton<PrintManager>(PrintManager(getIt<IPrintService>(), getIt<IThermalPrinterService>(), getIt<ISettingsService>()));
   getIt.registerSingleton<IScanService>(ScanServiceImpl(getIt<IEncryptionService>(), getIt<ISettingsService>()));
   getIt.registerSingleton<IQrGeneratorService>(QrGeneratorServiceImpl(getIt<IEncryptionService>(), getIt<ISettingsService>()));
+
+  // Repositories
   getIt.registerSingleton<IProductRepository>(ProductRepositoryImpl());
   getIt.registerSingleton<IBillRepository>(BillRepositoryImpl());
+
+  // Cubits - अब सभी dependencies automatically inject हो जाएँगी
   getIt.registerFactory<SettingsCubit>(() => SettingsCubit(getIt<ISettingsService>()));
   getIt.registerFactory<AnalyticsCubit>(() => AnalyticsCubit(getIt<IBillRepository>(), getIt<IProductRepository>()));
   getIt.registerFactory<DailySalesCubit>(() => DailySalesCubit(getIt<IBillRepository>(), getIt<ISettingsService>()));
-  getIt.registerFactory<AddProductCubit>(() => AddProductCubit());
+  getIt.registerFactory<AddProductCubit>(() => AddProductCubit(getIt<IProductRepository>(), getIt<IQrGeneratorService>(), getIt<IEncryptionService>()));
+  getIt.registerFactory<QuickScanCubit>(() => QuickScanCubit(getIt<IScanService>()));
+  getIt.registerFactory<ProductListCubit>(() => ProductListCubit(getIt<IProductRepository>(), getIt<PrintManager>()));
+  getIt.registerFactory<HomeCubit>(() => HomeCubit());
+  getIt.registerFactory<SplashCubit>(() => SplashCubit());
+
+  // ✅ BillingCubit भी getIt में register करें
+  getIt.registerFactory<BillingCubit>(() => BillingCubit(
+    scanService: getIt<IScanService>(),
+    printManager: getIt<PrintManager>(),
+    encryptionService: getIt<IEncryptionService>(),
+    settingsService: getIt<ISettingsService>(),
+    billRepository: getIt<IBillRepository>(),
+  ));
 }

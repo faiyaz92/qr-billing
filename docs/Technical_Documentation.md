@@ -15,6 +15,51 @@
 - **Separation of Concerns**: Business logic, data access, UI logic separated
 - **SOLID Principles**: Interface-based design with dependency injection
 
+#### Dependency Injection Coding Standard
+**Rule: All Cubits, Services, and Repositories must be instantiated only through Dependency Injection**
+
+- **Cubits**: All cubits must inject services and repositories through constructor parameters
+- **Services**: All services must inject their dependencies (encryption, settings, etc.) through constructor
+- **Repositories**: All repositories must inject their dependencies through constructor
+- **UI Layer**: No screen can manually instantiate cubits - only use `getIt<CubitName>()`
+
+**✅ Correct Pattern:**
+```dart
+// Cubit with injected dependencies
+class BillingCubit extends Cubit<BillingState> {
+  final IScanService _scanService;
+  final IBillRepository _billRepository;
+
+  BillingCubit(this._scanService, this._billRepository) : super(BillingInitial());
+}
+
+// getIt registration
+getIt.registerFactory<BillingCubit>(() => BillingCubit(
+  getIt<IScanService>(),
+  getIt<IBillRepository>(),
+));
+
+// UI usage
+BlocProvider(create: (_) => getIt<BillingCubit>())
+```
+
+**❌ Wrong Pattern (Avoid):**
+```dart
+// Manual instantiation - NOT ALLOWED
+BlocProvider(create: (_) => BillingCubit(ScanServiceImpl(), BillRepositoryImpl()))
+
+// getIt inside cubit - NOT ALLOWED
+class BillingCubit extends Cubit<BillingState> {
+  final IScanService _scanService = getIt<IScanService>(); // ❌ Wrong
+}
+```
+
+**Benefits:**
+- **Testability**: All dependencies can be mocked for unit testing
+- **Maintainability**: Dependency changes only need to be made in injection.dart
+- **Consistency**: All objects follow the same dependency injection pattern
+- **Clean Code**: No manual object creation, only `getIt<ObjectName>()`
+
 ### Database Schema
 
 #### 1. products Table

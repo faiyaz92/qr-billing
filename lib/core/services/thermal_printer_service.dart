@@ -61,90 +61,14 @@ class ThermalPrinterServiceImpl implements IThermalPrinterService {
   }
 
   @override
-  Future<bool> printReceipt(Uint8List receiptData) async {
+  Future<bool> printReceipt(List<LineText> printData) async {
     if (!_isConnected) {
       return false;
     }
 
     try {
-      String printType = 'TEXT';
-      String title = 'Receipt';
-      String data = 'Sample Data';
-
-      if (receiptData.isNotEmpty) {
-        final payload = utf8.decode(receiptData, allowMalformed: true);
-        final parts = payload.split('|');
-        if (parts.length >= 3) {
-          printType = parts[0];
-          title = parts[1];
-          data = parts.sublist(2).join('|');
-        } else if (payload.isNotEmpty) {
-          data = payload;
-        }
-      }
-
-      // Create print data for thermal printer
       Map<String, dynamic> config = Map();
-      List<LineText> list = [];
-
-      // Header
-      list.add(LineText(
-        type: LineText.TYPE_TEXT,
-        content: 'QR-Based Billing',
-        weight: 2,
-        align: LineText.ALIGN_CENTER,
-        fontZoom: 2,
-      ));
-
-      list.add(LineText(
-        type: LineText.TYPE_TEXT,
-        content: title,
-        align: LineText.ALIGN_CENTER,
-      ));
-
-      list.add(LineText(linefeed: 1));
-
-      // Product details
-      list.add(LineText(
-        type: LineText.TYPE_TEXT,
-        content: 'Type: $printType',
-      ));
-
-      // Only print data text for non-QR/BARCODE types
-      if (printType.toUpperCase() != 'QR' && printType.toUpperCase() != 'BARCODE') {
-        list.add(LineText(
-          type: LineText.TYPE_TEXT,
-          content: 'Data: $data',
-        ));
-      }
-
-      list.add(LineText(
-        type: LineText.TYPE_TEXT,
-        content: 'Date: ${DateTime.now().toString().split(' ')[0]}',
-      ));
-
-      list.add(LineText(linefeed: 2));
-
-      if (printType.toUpperCase() == 'QR') {
-        list.add(LineText(
-          type: LineText.TYPE_QRCODE,
-          content: data,
-          align: LineText.ALIGN_CENTER,
-          size: 6, // QR code size
-        ));
-      } else if (printType.toUpperCase() == 'BARCODE') {
-        list.add(LineText(
-          type: LineText.TYPE_BARCODE,
-          content: data,
-          align: LineText.ALIGN_CENTER,
-          width: 2,
-          height: 80,
-        ));
-      }
-
-      list.add(LineText(linefeed: 3));
-
-      await _bluetoothPrint.printReceipt(config, list);
+      await _bluetoothPrint.printReceipt(config, printData);
       return true;
     } catch (e) {
       return false;

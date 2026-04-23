@@ -3,10 +3,19 @@ import 'package:flutter/material.dart';
 import '../../data/models/scanned_data.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../presentation/cubits/product_list_cubit.dart';
+import '../../presentation/cubits/settings_cubit.dart';
+import '../../presentation/cubits/settings_state.dart';
 import '../../core/injection.dart';
 import '../../data/models/product.dart';
 import '../../core/services/i_encryption_service.dart';
 import 'dart:convert';
+import '../widgets/product_details/product_header_card.dart';
+import '../widgets/product_details/pricing_info_widget.dart';
+import '../widgets/product_details/business_info_widget.dart';
+import '../widgets/product_details/product_info_widget.dart';
+import '../widgets/product_details/qr_code_display_widget.dart';
+import '../widgets/customer_trust_indicators_widget.dart';
+import '../widgets/action_buttons_widget.dart';
 
 @RoutePage()
 class ProductDetailsScreen extends StatefulWidget {
@@ -65,11 +74,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         actions: [
           IconButton(
             icon: Icon(_showSensitiveData ? Icons.visibility_off : Icons.visibility),
-            onPressed: () {
-              setState(() {
-                _showSensitiveData = !_showSensitiveData;
-              });
-            },
+            onPressed: _toggleSensitiveData,
             tooltip: _showSensitiveData ? 'Hide Business Details' : 'Show Business Details',
           ),
         ],
@@ -91,276 +96,37 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Product Header Card (full width)
-              SizedBox(
-                width: double.infinity,
-                child: Card(
-                  margin: EdgeInsets.zero,
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF1E40AF),
-                          Color(0xFF06B6D4),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _fullData['name'] ?? 'Unknown Product',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _fullData['brand'] ?? 'No Brand',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+              ProductHeaderCard(fullData: _fullData),
 
               const SizedBox(height: 20),
 
               // Product Information Cards
-              _buildInfoCard(
-                title: 'Online Pricing Information',
-                icon: Icons.price_check,
-                children: [
-                  _buildInfoRow('Online Price', '₹${(data['selling_price'] as num?)?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
-                  if (data['original_price'] != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'MRP',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
-                            ),
-                          ),
-                          Text(
-                            '₹${(data['original_price'] as num?)?.toDouble().toStringAsFixed(2) ?? '0.00'}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              decoration: TextDecoration.lineThrough,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  if (data['tax'] != null)
-                    _buildInfoRow('Tax Rate', '${(data['tax'] as num?)?.toDouble().toStringAsFixed(2) ?? '0.00'}%'),
-                ],
-              ),
+              PricingInfoWidget(data: data),
 
               const SizedBox(height: 16),
 
               // Business Information (always shown, but purchase price conditional)
-              _buildInfoCard(
-                title: 'Business Information',
-                icon: Icons.business,
-                children: [
-                  if (_showSensitiveData && data['purchase_price'] != null)
-                    _buildInfoRow('Purchase Price', '₹${(data['purchase_price'] as num?)?.toDouble().toStringAsFixed(2) ?? '0.00'}'),
-                  if (data['selling_price'] != null && data['purchase_price'] != null)
-                    _buildInfoRow(
-                      'Profit Margin',
-                      '₹${(((data['selling_price'] as num).toDouble() - (data['purchase_price'] as num).toDouble())).toStringAsFixed(2)}',
-                    ),
-                  if (data['selling_price'] != null && data['purchase_price'] != null)
-                    _buildInfoRow(
-                      'Profit %',
-                      '${((((data['selling_price'] as num).toDouble() - (data['purchase_price'] as num).toDouble()) / (data['purchase_price'] as num).toDouble()) * 100).toStringAsFixed(2)}%',
-                    ),
-                ],
+              BusinessInfoWidget(
+                data: data,
+                showSensitiveData: _showSensitiveData,
               ),
 
-              _buildInfoCard(
-                title: 'Product Information',
-                icon: Icons.info_outline,
-                children: [
-                  _buildInfoRow('Product Name', data['name'] ?? 'N/A'),
-                  _buildInfoRow('Brand', data['brand'] ?? 'N/A'),
-                  if (data['date_of_purchase'] != null)
-                    _buildInfoRow('Purchase Date', data['date_of_purchase'] ?? 'N/A'),
-                  if (data['original_price'] != null && data['selling_price'] != null)
-                    _buildInfoRow(
-                      'You Save',
-                      '₹${(((data['original_price'] as num).toDouble() - (data['selling_price'] as num).toDouble())).toStringAsFixed(2)}',
-                    ),
-                ],
-              ),
+              ProductInfoWidget(data: data),
 
               const SizedBox(height: 16),
 
               // QR Code Display
-              _buildInfoCard(
-                title: 'Product QR Code',
-                icon: Icons.qr_code_2,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        '✅ Verified Product\nScan Complete',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.green,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              QRCodeDisplayWidget(),
 
               const SizedBox(height: 20),
 
               // Customer Trust Indicators
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                color: Colors.green.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Icon(Icons.verified, color: Colors.green.shade700, size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'This product is verified and priced according to our online catalog. The price shown is the official online selling price.',
-                          style: TextStyle(
-                            color: Colors.green.shade800,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const CustomerTrustIndicatorsWidget(),
 
               const SizedBox(height: 20),
 
               // Action Buttons
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              final cubit = getIt<ProductListCubit>();
-                              await cubit.printQRCode(_product);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('QR Code printed successfully')),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Print failed: $e')),
-                                );
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.qr_code),
-                          label: const Text('Print QR'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF1E40AF),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            try {
-                              final cubit = getIt<ProductListCubit>();
-                              await cubit.printBarcode(_product);
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Barcode printed successfully')),
-                                );
-                              }
-                            } catch (e) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Print failed: $e')),
-                                );
-                              }
-                            }
-                          },
-                          icon: const Icon(Icons.view_week),
-                          label: const Text('Print Barcode'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF06B6D4),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('Back'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ActionButtonsWidget(product: _product),
             ],
           ),
         ),
@@ -428,5 +194,120 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> {
         ],
       ),
     );
+  }
+
+  void _toggleSensitiveData() async {
+    if (_showSensitiveData) {
+      // If already showing, just hide without PIN
+      setState(() {
+        _showSensitiveData = false;
+      });
+      return;
+    }
+
+    // Show PIN dialog to enable sensitive data
+    final correctPin = await _showPinDialog();
+    if (correctPin == true) {
+      setState(() {
+        _showSensitiveData = true;
+      });
+    }
+  }
+
+  Future<bool?> _showPinDialog() async {
+    final pinController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool? result;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.lock, color: Colors.red.shade700),
+            const SizedBox(width: 12),
+            const Text('Enter PIN'),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter your admin PIN to view business details',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: pinController,
+                decoration: const InputDecoration(
+                  labelText: 'PIN',
+                  hintText: 'Enter PIN',
+                  border: OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                obscureText: true,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'PIN is required';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              result = false;
+              Navigator.of(context).pop();
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState?.validate() ?? false) {
+                // Get stored PIN from settings
+                final settingsCubit = getIt<SettingsCubit>();
+                final storedPin = await _getStoredPin(settingsCubit);
+
+                if (pinController.text.trim() == storedPin) {
+                  result = true;
+                  Navigator.of(context).pop();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Incorrect PIN'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Verify'),
+          ),
+        ],
+      ),
+    );
+
+    return result;
+  }
+
+  Future<String> _getStoredPin(SettingsCubit settingsCubit) async {
+    // Load settings to get the PIN
+    await settingsCubit.loadSettings();
+    final state = settingsCubit.state;
+    if (state is SettingsLoaded) {
+      return state.pin ?? '';
+    }
+    return '';
   }
 }

@@ -5,4 +5,6 @@ abstract class ISettingsService {
   Future<String?> getStoreSecret();
   Future<void> saveStoreName(String name);
   Future<String?> getStoreName();
+  Future<void> savePrinterPreference(String preference); // 'bluetooth' or 'system'
+  Future<String> getPrinterPreference(); // returns 'bluetooth' or 'system', defaults to 'bluetooth'
 }

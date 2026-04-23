@@ -18,6 +18,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _storeSecretController = TextEditingController();
   final _storeNameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  String _printerPreference = 'bluetooth'; // Default to bluetooth
 
   @override
   void initState() {
@@ -42,6 +43,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
         backgroundColor: const Color(0xFF1E40AF),
         foregroundColor: Colors.white,
       ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _saveSettings,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1E40AF),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Save Settings',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: BlocConsumer<SettingsCubit, SettingsState>(
         listener: (context, state) {
           if (state is SettingsLoaded) {
@@ -49,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _pinController.text = state.pin ?? '';
             _storeSecretController.text = state.storeSecret ?? '';
             _storeNameController.text = state.storeName ?? '';
+            _printerPreference = state.printerPreference;
           } else if (state is SettingsSaved) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Settings saved successfully!')),
@@ -186,31 +225,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
-
-                  // Save Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _saveSettings,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1E40AF),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Save Settings',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-
                   const SizedBox(height: 24),
 
                   // Store Name Field
@@ -262,6 +276,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                   const SizedBox(height: 24),
                   Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.print, color: Colors.blue.shade700, size: 24),
+                              const SizedBox(width: 12),
+                              const Text(
+                                'Default Printer',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Choose your preferred printing method for bills',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          RadioListTile<String>(
+                            title: const Text('Bluetooth Thermal Printer'),
+                            subtitle: const Text('Fast receipt printing (recommended)'),
+                            value: 'bluetooth',
+                            groupValue: _printerPreference,
+                            onChanged: (value) {
+                              setState(() {
+                                _printerPreference = value!;
+                              });
+                              // Save immediately when changed
+                              context.read<SettingsCubit>().saveSettings(
+                                pin: _pinController.text.trim(),
+                                storeSecret: _storeSecretController.text.trim(),
+                                storeName: _storeNameController.text.trim(),
+                                printerPreference: value,
+                              );
+                            },
+                            activeColor: Colors.blue,
+                          ),
+                          RadioListTile<String>(
+                            title: const Text('System Printer'),
+                            subtitle: const Text('PDF printing to any connected printer'),
+                            value: 'system',
+                            groupValue: _printerPreference,
+                            onChanged: (value) {
+                              setState(() {
+                                _printerPreference = value!;
+                              });
+                              // Save immediately when changed
+                              context.read<SettingsCubit>().saveSettings(
+                                pin: _pinController.text.trim(),
+                                storeSecret: _storeSecretController.text.trim(),
+                                storeName: _storeNameController.text.trim(),
+                                printerPreference: value,
+                              );
+                            },
+                            activeColor: Colors.blue,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+                  if (_printerPreference == 'bluetooth') Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -353,6 +443,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         pin: _pinController.text.trim(),
         storeSecret: _storeSecretController.text.trim(),
         storeName: _storeNameController.text.trim(),
+        printerPreference: _printerPreference,
       );
     }
   }
