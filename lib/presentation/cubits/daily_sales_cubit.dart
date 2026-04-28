@@ -48,22 +48,34 @@ class DailySalesCubit extends Cubit<DailySalesState> {
         final date = entry.key;
         final dayBills = entry.value;
 
-        double totalSales = 0;
+        double totalSales = 0;    // with tax — what customer paid
         double totalPurchase = 0;
+        double totalRevenue = 0;   // without tax — our actual revenue for profit
+        final Map<int, double> billDisplayTotals = {}; // bill_id → finalTotal with tax
 
         for (final bill in dayBills) {
-          totalSales += bill.finalTotal;
-          // Calculate purchase amount from bill items for accurate profit tracking
           final items = await _billRepository.getBillItems(bill.id!);
+
+          // Calculate tax from stored bill_items (tax rate + selling price + qty)
+          double billTaxAmount = 0.0;
           double billPurchaseAmount = 0.0;
           for (final item in items) {
+            final itemTotal = item.sellingPrice * item.quantity;
+            billTaxAmount += itemTotal * ((item.taxRate ?? 0.0) / 100);
             billPurchaseAmount += item.purchasePrice * item.quantity;
           }
+
+          // Display: total + tax - discount (what customer paid)
+          final billDisplayTotal = bill.totalAmount + billTaxAmount - (bill.discount ?? 0.0);
+          billDisplayTotals[bill.id!] = billDisplayTotal;
+          totalSales += billDisplayTotal;
+          // Profit: selling - discount - purchase (tax excluded — not our money)
+          totalRevenue += bill.totalAmount - (bill.discount ?? 0.0);
           totalPurchase += billPurchaseAmount;
         }
 
-        final totalProfit = totalSales - totalPurchase;
-        final profitPercentage = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0.0;
+        final totalProfit = totalRevenue - totalPurchase; // profit without tax ✅
+        final profitPercentage = totalPurchase > 0 ? (totalProfit / totalPurchase) * 100 : 0.0;
 
         dailySales.add(DailySales(
           date: date,
@@ -72,6 +84,7 @@ class DailySalesCubit extends Cubit<DailySalesState> {
           totalProfit: totalProfit,
           profitPercentage: profitPercentage,
           bills: dayBills,
+          billDisplayTotals: billDisplayTotals,
         ));
       }
 
@@ -90,6 +103,7 @@ class DailySalesCubit extends Cubit<DailySalesState> {
             totalProfit: current.totalProfit,
             profitPercentage: current.profitPercentage,
             bills: current.bills,
+            billDisplayTotals: current.billDisplayTotals,
             trend: 'up',
           );
         } else if (current.totalSales < previous.totalSales) {
@@ -100,6 +114,7 @@ class DailySalesCubit extends Cubit<DailySalesState> {
             totalProfit: current.totalProfit,
             profitPercentage: current.profitPercentage,
             bills: current.bills,
+            billDisplayTotals: current.billDisplayTotals,
             trend: 'down',
           );
         } else {
@@ -110,6 +125,7 @@ class DailySalesCubit extends Cubit<DailySalesState> {
             totalProfit: current.totalProfit,
             profitPercentage: current.profitPercentage,
             bills: current.bills,
+            billDisplayTotals: current.billDisplayTotals,
             trend: 'neutral',
           );
         }

@@ -271,7 +271,7 @@ class DailySalesScreen extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                children: day.bills.map((bill) => Container(
+                                children: day.bills.reversed.map((bill) => Container(
                                   decoration: BoxDecoration(
                                     color: Colors.grey[50],
                                     borderRadius: BorderRadius.circular(8),
@@ -297,7 +297,7 @@ class DailySalesScreen extends StatelessWidget {
                                       ),
                                     ),
                                     subtitle: Text(
-                                      'Total: ₹${bill.finalTotal.toStringAsFixed(2)}',
+                                      'Final Total: ₹${(day.billDisplayTotals[bill.id] ?? bill.finalTotal).toStringAsFixed(2)}',
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,

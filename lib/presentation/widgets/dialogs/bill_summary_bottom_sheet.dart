@@ -223,14 +223,19 @@ class BillSummaryBottomSheet extends StatelessWidget {
                           child: Text('Discount:', textAlign: TextAlign.right),
                         ),
                         const SizedBox(width: 8),
+                        const Text(
+                          '₹',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+                        ),
+                        const SizedBox(width: 4),
                         Expanded(
                           child: TextField(
                             controller: TextEditingController(text: data.discount.toStringAsFixed(2)),
+                            textAlign: TextAlign.right,
                             decoration: const InputDecoration(
                               hintText: '0.00',
                               border: OutlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              prefixText: '₹',
                             ),
                             keyboardType: TextInputType.number,
                             onChanged: (value) {

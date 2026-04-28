@@ -1,7 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../app_router.dart';
 import '../cubits/billing_cubit.dart';
+import '../widgets/dialogs/bluetooth_printer_not_connected_dialog.dart';
 
 @RoutePage()
 class BillDetailScreen extends StatelessWidget {
@@ -35,7 +37,7 @@ class BillDetailScreen extends StatelessWidget {
         child: BlocBuilder<BillingCubit, BillingState>(
           builder: (context, state) {
             if (state is BillingUpdated) {
-              return Padding(
+              return SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,9 +474,30 @@ class BillDetailScreen extends StatelessWidget {
     );
   }
 
-  void _printBill(BuildContext context) {
-    // Use the same printBill method from billing cubit - identical to billing screen
-    context.read<BillingCubit>().printBill();
+  void _printBill(BuildContext context) async {
+    try {
+      await context.read<BillingCubit>().printBill();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bill printed successfully')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        if (e.toString().contains('BLUETOOTH_PRINTER_NOT_CONNECTED')) {
+          showDialog(
+            context: context,
+            builder: (_) => BluetoothPrinterNotConnectedDialog(
+              onGoToSettings: () => context.router.push(ThermalPrinterRoute()),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Print failed: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _showShareDialog(BuildContext context, BillingUpdated state) {

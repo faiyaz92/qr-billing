@@ -46,7 +46,14 @@ class DailySalesError extends DailySalesState {
 class DailySalesViewBill extends DailySalesState {
   final int billId;
 
-  const DailySalesViewBill(this.billId);
+  DailySalesViewBill(this.billId);
+
+  // Always treat as new state so BlocListener fires even for same billId
+  @override
+  bool operator ==(Object other) => false;
+
+  @override
+  int get hashCode => Object.hash(billId, DateTime.now().microsecondsSinceEpoch);
 
   @override
   List<Object?> get props => [billId];
@@ -55,7 +62,14 @@ class DailySalesViewBill extends DailySalesState {
 class DailySalesEditBill extends DailySalesState {
   final int billId;
 
-  const DailySalesEditBill(this.billId);
+  DailySalesEditBill(billId) : billId = billId;
+
+  // Always treat as new state so BlocListener fires even for same billId
+  @override
+  bool operator ==(Object other) => false;
+
+  @override
+  int get hashCode => Object.hash(billId, DateTime.now().microsecondsSinceEpoch);
 
   @override
   List<Object?> get props => [billId];
@@ -69,6 +83,8 @@ class DailySales {
   final double profitPercentage;
   final List<Bill> bills;
   final String trend; // 'up', 'down', or 'neutral'
+  /// bill_id → finalTotal with tax (for display in list tile)
+  final Map<int, double> billDisplayTotals;
 
   DailySales({
     required this.date,
@@ -78,5 +94,6 @@ class DailySales {
     required this.profitPercentage,
     required this.bills,
     this.trend = 'neutral',
-  });
+    Map<int, double>? billDisplayTotals,
+  }) : billDisplayTotals = billDisplayTotals ?? {};
 }
