@@ -60,8 +60,11 @@ class _ProductListViewState extends State<ProductListView> {
                   products: state.products,
                   showQr: state.showQr,
                   showBarcode: state.showBarcode,
-                  onEdit: () {
-                    // TODO: Navigate to edit product
+                  onEdit: (product) async {
+                    await context.router.push(AddProductRoute(product: product));
+                    if (context.mounted) {
+                      context.read<ProductListCubit>().loadProducts();
+                    }
                   },
                   onView: (product) {
                     context.router.push(AdminProductDetailsRoute(product: product));
@@ -76,7 +79,13 @@ class _ProductListViewState extends State<ProductListView> {
               ],
             ),
             floatingActionButton: FloatingActionButton(
-              onPressed: () => context.router.push(const AddProductRoute()),
+              onPressed: () async {
+                await context.router.push(AddProductRoute());
+                // Screen returned (pop), refresh the product list
+                if (context.mounted) {
+                  context.read<ProductListCubit>().loadProducts();
+                }
+              },
               elevation: 4,
               child: const Icon(Icons.add),
             ),

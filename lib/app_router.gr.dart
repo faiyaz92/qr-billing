@@ -12,18 +12,48 @@ part of 'app_router.dart';
 
 /// generated route for
 /// [AddProductScreen]
-class AddProductRoute extends PageRouteInfo<void> {
-  const AddProductRoute({List<PageRouteInfo>? children})
-    : super(AddProductRoute.name, initialChildren: children);
+class AddProductRoute extends PageRouteInfo<AddProductRouteArgs> {
+  AddProductRoute({Key? key, Product? product, List<PageRouteInfo>? children})
+    : super(
+        AddProductRoute.name,
+        args: AddProductRouteArgs(key: key, product: product),
+        initialChildren: children,
+      );
 
   static const String name = 'AddProductRoute';
 
   static PageInfo page = PageInfo(
     name,
     builder: (data) {
-      return const AddProductScreen();
+      final args = data.argsAs<AddProductRouteArgs>(
+        orElse: () => const AddProductRouteArgs(),
+      );
+      return AddProductScreen(key: args.key, product: args.product);
     },
   );
+}
+
+class AddProductRouteArgs {
+  const AddProductRouteArgs({this.key, this.product});
+
+  final Key? key;
+
+  final Product? product;
+
+  @override
+  String toString() {
+    return 'AddProductRouteArgs{key: $key, product: $product}';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    if (other is! AddProductRouteArgs) return false;
+    return key == other.key && product == other.product;
+  }
+
+  @override
+  int get hashCode => key.hashCode ^ product.hashCode;
 }
 
 /// generated route for

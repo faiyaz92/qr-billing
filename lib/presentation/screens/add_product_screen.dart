@@ -7,9 +7,12 @@ import '../../core/injection.dart';
 import '../cubits/add_product_cubit.dart';
 import '../cubits/add_product_state.dart';
 
+import '../../data/models/product.dart';
+
 @RoutePage()
 class AddProductScreen extends StatelessWidget {
-  const AddProductScreen({super.key});
+  final Product? product;
+  const AddProductScreen({super.key, this.product});
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +44,8 @@ class AddProductScreen extends StatelessWidget {
                         icon: const Icon(Icons.arrow_back, color: Colors.white),
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        'Add Product',
+                      Text(
+                        product == null ? 'Add Product' : 'Update Product',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -73,8 +76,8 @@ class AddProductScreen extends StatelessWidget {
                                   size: 64,
                                 ),
                                 const SizedBox(height: 16),
-                                const Text(
-                                  'Product Added Successfully!',
+                                Text(
+                                  product == null ? 'Product Added Successfully!' : 'Product Updated Successfully!',
                                   style: TextStyle(
                                     color: Colors.green,
                                     fontSize: 18,
@@ -153,7 +156,7 @@ class AddProductScreen extends StatelessWidget {
                             ),
                           ),
                         if (state is! AddProductSuccess)
-                          const Expanded(child: AddProductForm()),
+                          Expanded(child: AddProductForm(product: product)),
                       ],
                     );
                   },
@@ -168,7 +171,8 @@ class AddProductScreen extends StatelessWidget {
 }
 
 class AddProductForm extends StatefulWidget {
-  const AddProductForm({super.key});
+  final Product? product;
+  const AddProductForm({super.key, this.product});
 
   @override
   _AddProductFormState createState() => _AddProductFormState();
@@ -179,6 +183,27 @@ class _AddProductFormState extends State<AddProductForm> {
   final Map<String, dynamic> _data = {};
   final TextEditingController _nameController = TextEditingController();
   DateTime? _selectedDate;
+
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.product != null) {
+      _nameController.text = widget.product!.name ?? '';
+      _data['name'] = widget.product!.name;
+      _data['brand'] = widget.product!.brand;
+      _data['purchase_price'] = widget.product!.purchasePrice;
+      _data['selling_price'] = widget.product!.sellingPrice;
+      _data['original_price'] = widget.product!.originalPrice;
+      _data['tax'] = widget.product!.tax;
+      _data['date_of_purchase'] = widget.product!.dateOfPurchase;
+      if (widget.product!.dateOfPurchase != null && widget.product!.dateOfPurchase!.isNotEmpty) {
+          try {
+              _selectedDate = DateTime.parse(widget.product!.dateOfPurchase!);
+          } catch(e) {}
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -281,6 +306,7 @@ class _AddProductFormState extends State<AddProductForm> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    initialValue: widget.product?.brand ?? '',
                     decoration: InputDecoration(
                       labelText: 'Enter brand name',
                       hintText: 'e.g., Apple',
@@ -379,6 +405,7 @@ class _AddProductFormState extends State<AddProductForm> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    initialValue: widget.product?.purchasePrice?.toString() ?? '',
                     decoration: InputDecoration(
                       labelText: 'Enter purchase price',
                       hintText: '0.00',
@@ -434,6 +461,7 @@ class _AddProductFormState extends State<AddProductForm> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    initialValue: widget.product?.sellingPrice?.toString() ?? '',
                     decoration: InputDecoration(
                       labelText: 'Enter selling price',
                       hintText: '0.00',
@@ -489,6 +517,7 @@ class _AddProductFormState extends State<AddProductForm> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    initialValue: widget.product?.originalPrice?.toString() ?? '',
                     decoration: InputDecoration(
                       labelText: 'Enter original price',
                       hintText: '0.00',
@@ -541,6 +570,7 @@ class _AddProductFormState extends State<AddProductForm> {
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
+                    initialValue: widget.product?.tax?.toString() ?? '',
                     decoration: InputDecoration(
                       labelText: 'Enter tax percentage',
                       hintText: '18',
@@ -575,7 +605,11 @@ class _AddProductFormState extends State<AddProductForm> {
                 FocusScope.of(context).unfocus();
                 if (_formKey.currentState!.validate()) {
                   _formKey.currentState!.save();
-                  context.read<AddProductCubit>().addProduct(_data);
+                  if (widget.product != null) {
+                    context.read<AddProductCubit>().updateProduct(widget.product!.id!, _data);
+                  } else {
+                    context.read<AddProductCubit>().addProduct(_data);
+                  }
                 }
               },
               style: ElevatedButton.styleFrom(
@@ -587,8 +621,8 @@ class _AddProductFormState extends State<AddProductForm> {
                 ),
                 elevation: 4,
               ),
-              child: const Text(
-                'Add Product',
+              child: Text(
+                widget.product == null ? 'Add Product' : 'Update Product',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,

@@ -6,7 +6,7 @@ class ProductListWidget extends StatelessWidget {
   final List<Product> products;
   final bool showQr;
   final bool showBarcode;
-  final VoidCallback onEdit;
+  final void Function(Product) onEdit;
   final void Function(Product) onView;
   final void Function(Product) onDelete;
   final void Function(Product) onPrint;
@@ -52,7 +52,7 @@ class ProductListWidget extends StatelessWidget {
                   product: product,
                   showQr: showQr,
                   showBarcode: showBarcode,
-                  onEdit: onEdit,
+                  onEdit: () => onEdit(product),
                   onView: () => onView(product),
                   onDelete: () => onDelete(product),
                   onPrint: () => onPrint(product),

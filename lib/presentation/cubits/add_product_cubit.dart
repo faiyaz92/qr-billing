@@ -16,14 +16,12 @@ class AddProductCubit extends Cubit<AddProductState> {
   Future<void> addProduct(Map<String, dynamic> data) async {
     emit(AddProductLoading());
     try {
-      // Encrypt sensitive data
       final sensitiveData = {
         'date_of_purchase': data['date_of_purchase'],
         'purchase_price': data['purchase_price'],
       };
       final encryptedSensitive = _encryption.encryptData(jsonEncode(sensitiveData));
 
-      // Prepare data map for QR with compact field names
       final qrDataMap = {
         'n': data['name'],
         'b': data['brand'],
@@ -45,6 +43,43 @@ class AddProductCubit extends Cubit<AddProductState> {
         qrData: qrData,
       );
       await _productRepo.insertProduct(product);
+      emit(AddProductSuccess(qrData));
+    } catch (e) {
+      emit(AddProductError(e.toString()));
+    }
+  }
+
+  Future<void> updateProduct(int id, Map<String, dynamic> data) async {
+    emit(AddProductLoading());
+    try {
+      final sensitiveData = {
+        'date_of_purchase': data['date_of_purchase'],
+        'purchase_price': data['purchase_price'],
+      };
+      final encryptedSensitive = _encryption.encryptData(jsonEncode(sensitiveData));
+
+      final qrDataMap = {
+        'n': data['name'],
+        'b': data['brand'],
+        't': data['tax'],
+        'sp': data['selling_price'],
+        'op': data['original_price'],
+        'esd': encryptedSensitive,
+      };
+
+      final qrData = await _qrGenerator.generateQrData(1, qrDataMap);
+      final product = Product(
+        id: id,
+        name: data['name'],
+        brand: data['brand'],
+        dateOfPurchase: data['date_of_purchase'],
+        purchasePrice: data['purchase_price'],
+        sellingPrice: data['selling_price'],
+        originalPrice: data['original_price'],
+        tax: data['tax'],
+        qrData: qrData,
+      );
+      await _productRepo.updateProduct(product);
       emit(AddProductSuccess(qrData));
     } catch (e) {
       emit(AddProductError(e.toString()));
