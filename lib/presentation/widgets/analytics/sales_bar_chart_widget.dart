@@ -10,6 +10,7 @@ class SalesBarChartWidget extends StatelessWidget {
   double _getMaxYValue() {
     final values = [state.todaySales, state.monthlySales, state.averageOrderValue];
     final maxValue = values.reduce((a, b) => a > b ? a : b);
+    if (maxValue == 0) return 100.0; // Prevent 0 which causes horizontalInterval error
     return maxValue * 1.2; // Add 20% padding
   }
 

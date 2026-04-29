@@ -72,12 +72,13 @@ class DbImportExportServiceImpl implements IDbImportExportService {
     final products = await db.query('products');
     final bills = await db.query('bills', where: 'date >= ? AND date <= ?', whereArgs: [startIso, endIso]);
     
-    final billIds = bills.map((b) => b['id']).toList();
-    List<Map<String, Object?>> billItems = [];
-    if (billIds.isNotEmpty) {
-      final placeholders = List.filled(billIds.length, '?').join(',');
-      billItems = await db.query('bill_items', where: 'bill_id IN ($placeholders)', whereArgs: billIds);
-    }
+    // Fetch bill_items using JOIN to avoid SQLite variable limits (999 vars max) on large queries
+    final billItems = await db.rawQuery('''
+      SELECT bi.* 
+      FROM bill_items bi
+      INNER JOIN bills b ON bi.bill_id = b.id
+      WHERE b.date >= ? AND b.date <= ?
+    ''', [startIso, endIso]);
 
     final data = {
       'version': 1,
@@ -157,13 +158,14 @@ class DbImportExportServiceImpl implements IDbImportExportService {
 
     final products = await sourceDb.query('products');
     final bills = await sourceDb.query('bills', where: 'date >= ? AND date <= ?', whereArgs: [startIso, endIso]);
-    final billIds = bills.map((b) => b['id']).toList();
-
-    List<Map<String, Object?>> billItems = [];
-    if (billIds.isNotEmpty) {
-      final placeholders = List.filled(billIds.length, '?').join(',');
-      billItems = await sourceDb.query('bill_items', where: 'bill_id IN ($placeholders)', whereArgs: billIds);
-    }
+    
+    // Fetch bill_items using JOIN to avoid SQLite variable limits
+    final billItems = await sourceDb.rawQuery('''
+      SELECT bi.* 
+      FROM bill_items bi
+      INNER JOIN bills b ON bi.bill_id = b.id
+      WHERE b.date >= ? AND b.date <= ?
+    ''', [startIso, endIso]);
 
     // Insert into tempDb
     Batch batch = tempDb.batch();
