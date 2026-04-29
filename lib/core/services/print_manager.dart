@@ -9,16 +9,20 @@ import 'i_thermal_printer_service.dart';
 import 'i_settings_service.dart';
 import '../../data/models/product.dart';
 
+import 'pdf_generator_service.dart';
+
 /// Centralized printing coordinator that handles all printing logic
 class PrintManager {
   final IPrintService _printService;
   final IThermalPrinterService _thermalPrinterService;
   final ISettingsService _settingsService;
+  final PdfGeneratorService _pdfGeneratorService;
 
   PrintManager(
     this._printService,
     this._thermalPrinterService,
     this._settingsService,
+    this._pdfGeneratorService,
   );
 
   /// Print a bill with customer and item details
@@ -42,7 +46,14 @@ class PrintManager {
       await _thermalPrinterService.printReceipt(thermalData);
     } else {
       // Create PDF for system printer
-      final pdfBytes = await _createBillPdf(storeName, customerName, customerMobile, date, items, summary);
+      final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+        storeName: storeName,
+        customerName: customerName,
+        customerMobile: customerMobile,
+        date: date,
+        items: items,
+        summary: summary,
+      );
       await _printService.printTextPdf(pdfBytes);
     }
   }

@@ -54,36 +54,11 @@ class ProductListWidget extends StatelessWidget {
                   showBarcode: showBarcode,
                   onEdit: onEdit,
                   onView: () => onView(product),
-                  onDelete: () => _showDeleteDialog(context, product),
+                  onDelete: () => onDelete(product),
                   onPrint: () => onPrint(product),
                 );
               },
             ),
     );
   }
-
-  void _showDeleteDialog(BuildContext context, Product product) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Product'),
-        content: Text('Are you sure you want to delete "${product.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              onDelete(product);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
 }

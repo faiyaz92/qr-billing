@@ -60,4 +60,13 @@ class ProductListCubit extends Cubit<ProductListState> {
       throw Exception('Print failed: $e');
     }
   }
+
+  Future<void> deleteProduct(int id) async {
+    try {
+      await _productRepo.deleteProduct(id);
+      loadProducts(); // Reload list after deletion
+    } catch (e) {
+      throw Exception('Failed to delete product: $e');
+    }
+  }
 }

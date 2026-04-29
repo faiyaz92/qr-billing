@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/services/print_manager.dart';
+import '../../core/services/pdf_generator_service.dart';
 import '../../core/services/i_scan_service.dart';
 import '../../core/services/i_encryption_service.dart';
 import '../../core/services/i_settings_service.dart';
@@ -56,6 +57,7 @@ class BillingCubit extends Cubit<BillingState> {
   final IEncryptionService _encryptionService;
   final ISettingsService _settingsService;
   final IBillRepository _billRepository;
+  final PdfGeneratorService _pdfGeneratorService;
   List<CartItem> _cart = [];
   bool _showProfitLossMode = false; // Track profit/loss mode
   int? _currentBillId; // Track current bill ID for updates
@@ -67,11 +69,13 @@ class BillingCubit extends Cubit<BillingState> {
     required IEncryptionService encryptionService,
     required ISettingsService settingsService,
     required IBillRepository billRepository,
+    required PdfGeneratorService pdfGeneratorService,
   }) : _scanService = scanService,
        _printManager = printManager,
        _encryptionService = encryptionService,
        _settingsService = settingsService,
        _billRepository = billRepository,
+       _pdfGeneratorService = pdfGeneratorService,
        super(BillingUpdated([], showProfitLossMode: false, isEditMode: false, taxRate: 0.0));
 
   void toggleProfitLossMode() {
@@ -381,160 +385,36 @@ class BillingCubit extends Cubit<BillingState> {
     // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-    // Generate PDF
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Container(
-            padding: const pw.EdgeInsets.all(20),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Center(
-                  child: pw.Text(
-                    'BILL RECEIPT',
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-                pw.SizedBox(height: 20),
+    // Generate PDF using centralized service
+    final items = _cart.map((item) => {
+      'name': item.data.data['name'] ?? 'Unknown',
+      'quantity': item.quantity,
+      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
+      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
+      'discount': 0.0,
+    }).toList();
 
-                // Customer Info
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(),
-                    borderRadius: pw.BorderRadius.circular(5),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Customer: ${currentState.customerName ?? 'N/A'}',
-                        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.Text(
-                        'Mobile: ${currentState.customerMobile ?? 'N/A'}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      pw.Text(
-                        'Date: ${DateTime.now().toString().split(' ')[0]}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
+    final summary = {
+      'subtotal': calculateTotal(),
+      'totalItemDiscounts': 0.0,
+      'taxAmount': calculateTaxAmount(),
+      'discount': currentState.discount,
+      'finalTotal': calculateFinalTotal(),
+      'youSave': calculateYouSave(),
+    };
 
-                // Items Header
-                pw.Text(
-                  'Items:',
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 10),
-
-                // Items List
-                pw.Table(
-                  border: pw.TableBorder.all(),
-                  children: [
-                    // Header Row
-                    pw.TableRow(
-                      children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Item', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    // Item Rows
-                    ..._cart.map((item) {
-                      final data = item.data.data;
-                      final sellingPrice = double.tryParse(data['selling_price']?.toString() ?? '0') ?? 0.0;
-                      final itemTotal = sellingPrice * item.quantity;
-                      return pw.TableRow(
-                        children: [
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text(data['name'] ?? 'Unknown Product'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('${item.quantity}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('₹${sellingPrice.toStringAsFixed(2)}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('₹${itemTotal.toStringAsFixed(2)}'),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
-                ),
-                pw.SizedBox(height: 20),
-
-                // Summary
-                pw.Container(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        'Subtotal: ₹${calculateTotal().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      if (calculateTaxAmount() > 0)
-                        pw.Text(
-                          'Tax: ₹${calculateTaxAmount().toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                      if (currentState.discount > 0)
-                        pw.Text(
-                          'Discount: ₹${currentState.discount.toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                      pw.Text(
-                        'You Save: ₹${calculateYouSave().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      pw.Text(
-                        'Final Total: ₹${calculateFinalTotal().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+      storeName: storeName,
+      customerName: currentState.customerName ?? 'N/A',
+      customerMobile: currentState.customerMobile ?? 'N/A',
+      date: DateTime.now().toString().split(' ')[0],
+      items: items,
+      summary: summary,
     );
 
-    // Save to file
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(pdfBytes);
 
     // Share via Email - opens share dialog with email apps
     await Share.shareXFiles(
@@ -551,39 +431,36 @@ class BillingCubit extends Cubit<BillingState> {
     // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-    // Generate PDF
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        build: (pw.Context context) {
-          return pw.Column(
-            children: [
-              pw.Text(storeName, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 20),
-              ..._cart.map((item) {
-                return pw.Row(
-                  children: [
-                    pw.Text('${item.product.name} x${item.quantity}'),
-                    pw.Spacer(),
-                    pw.Text('${(item.product.sellingPrice * item.quantity).toStringAsFixed(2)}'),
-                  ],
-                );
-              }),
-              pw.Divider(),
-              if (calculateTaxAmount() > 0) pw.Text('Tax: ${calculateTaxAmount().toStringAsFixed(2)}'),
-              if (currentState.discount > 0) pw.Text('Discount: ${currentState.discount.toStringAsFixed(2)}'),
-              pw.Text('You Save: ${calculateYouSave().toStringAsFixed(2)}'),
-              pw.Text('Total: ${calculateFinalTotal().toStringAsFixed(2)}'),
-            ],
-          );
-        },
-      ),
+    // Generate PDF using centralized service
+    final items = _cart.map((item) => {
+      'name': item.data.data['name'] ?? 'Unknown',
+      'quantity': item.quantity,
+      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
+      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
+      'discount': 0.0,
+    }).toList();
+
+    final summary = {
+      'subtotal': calculateTotal(),
+      'totalItemDiscounts': 0.0,
+      'taxAmount': calculateTaxAmount(),
+      'discount': currentState.discount,
+      'finalTotal': calculateFinalTotal(),
+      'youSave': calculateYouSave(),
+    };
+
+    final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+      storeName: storeName,
+      customerName: currentState.customerName ?? 'N/A',
+      customerMobile: currentState.customerMobile ?? 'N/A',
+      date: DateTime.now().toString().split(' ')[0],
+      items: items,
+      summary: summary,
     );
 
-    // Save to file
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/bill.pdf');
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(pdfBytes);
 
     // Share to WhatsApp
     final whatsappUrl = 'whatsapp://send?phone=$mobile&text=Here is your bill';
@@ -754,161 +631,36 @@ class BillingCubit extends Cubit<BillingState> {
     // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-    // Generate PDF with actual bill data
-    final pdf = pw.Document();
+    // Generate PDF using centralized service
+    final items = _cart.map((item) => {
+      'name': item.data.data['name'] ?? 'Unknown',
+      'quantity': item.quantity,
+      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
+      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
+      'discount': 0.0,
+    }).toList();
 
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        build: (pw.Context context) {
-          return pw.Container(
-            padding: const pw.EdgeInsets.all(20),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Center(
-                  child: pw.Text(
-                    'BILL RECEIPT',
-                    style: pw.TextStyle(
-                      fontSize: 24,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ),
-                pw.SizedBox(height: 20),
+    final summary = {
+      'subtotal': calculateTotal(),
+      'totalItemDiscounts': 0.0,
+      'taxAmount': calculateTaxAmount(),
+      'discount': currentState.discount,
+      'finalTotal': calculateFinalTotal(),
+      'youSave': calculateYouSave(),
+    };
 
-                // Customer Info
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(
-                    border: pw.Border.all(),
-                    borderRadius: pw.BorderRadius.circular(5),
-                  ),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(
-                        'Customer: ${currentState.customerName ?? 'N/A'}',
-                        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-                      ),
-                      pw.Text(
-                        'Mobile: ${currentState.customerMobile ?? 'N/A'}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      pw.Text(
-                        'Date: ${DateTime.now().toString().split(' ')[0]}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                    ],
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-
-                // Items Header
-                pw.Text(
-                  'Items:',
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 10),
-
-                // Items List
-                pw.Table(
-                  border: pw.TableBorder.all(),
-                  children: [
-                    // Header Row
-                    pw.TableRow(
-                      children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Item', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    // Item Rows
-                    ..._cart.map((item) {
-                      final data = item.data.data;
-                      final sellingPrice = double.tryParse(data['selling_price']?.toString() ?? '0') ?? 0.0;
-                      final itemTotal = sellingPrice * item.quantity;
-                      return pw.TableRow(
-                        children: [
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text(data['name'] ?? 'Unknown Product'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('${item.quantity}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('₹${sellingPrice.toStringAsFixed(2)}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('₹${itemTotal.toStringAsFixed(2)}'),
-                          ),
-                        ],
-                      );
-                    }),
-                  ],
-                ),
-                pw.SizedBox(height: 20),
-
-                // Summary
-                pw.Container(
-                  alignment: pw.Alignment.centerRight,
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(
-                        'Subtotal: ₹${calculateTotal().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      if (calculateTaxAmount() > 0)
-                        pw.Text(
-                          'Tax: ₹${calculateTaxAmount().toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                      if (currentState.discount > 0)
-                        pw.Text(
-                          'Discount: ₹${currentState.discount.toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                      pw.Text(
-                        'You Save: ₹${calculateYouSave().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 14),
-                      ),
-                      pw.Text(
-                        'Final Total: ₹${calculateFinalTotal().toStringAsFixed(2)}',
-                        style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+    final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+      storeName: storeName,
+      customerName: currentState.customerName ?? 'N/A',
+      customerMobile: currentState.customerMobile ?? 'N/A',
+      date: DateTime.now().toString().split(' ')[0],
+      items: items,
+      summary: summary,
     );
 
-    // Save PDF to temporary file
     final output = await getTemporaryDirectory();
     final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(await pdf.save());
+    await file.writeAsBytes(pdfBytes);
 
     // Share the PDF file
     await Share.shareXFiles(

@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../domain/repositories/i_bill_repository.dart';
 import '../../core/services/i_settings_service.dart';
+import '../../core/services/pdf_generator_service.dart';
 import '../../data/models/bill.dart';
 import '../../data/models/bill_item.dart';
 import 'daily_sales_state.dart';
@@ -13,11 +14,12 @@ import 'package:pdf/pdf.dart';
 class DailySalesCubit extends Cubit<DailySalesState> {
   final IBillRepository _billRepository;
   final ISettingsService _settingsService;
+  final PdfGeneratorService _pdfGeneratorService;
   int _selectedMonth = DateTime.now().month;
   int _selectedYear = DateTime.now().year;
   String _searchQuery = '';
 
-  DailySalesCubit(this._billRepository, this._settingsService) : super(DailySalesInitial()) {
+  DailySalesCubit(this._billRepository, this._settingsService, this._pdfGeneratorService) : super(DailySalesInitial()) {
     loadSales();
   }
 
@@ -176,155 +178,37 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       // Get store name
       final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-      // Generate PDF
-      final pdf = pw.Document();
+      // Generate PDF using centralized service
+      final items = billItems.map((item) => {
+        'name': item.itemName ?? 'Unknown',
+        'quantity': item.quantity,
+        'price': item.sellingPrice,
+        'total': item.sellingPrice * item.quantity,
+        'discount': item.itemDiscount ?? 0.0,
+      }).toList();
 
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) {
-            return pw.Container(
-              padding: const pw.EdgeInsets.all(20),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  // Header
-                  pw.Center(
-                    child: pw.Text(
-                      storeName,
-                      style: pw.TextStyle(
-                        fontSize: 24,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
+      final summary = {
+        'subtotal': bill.totalAmount,
+        'totalItemDiscounts': 0.0,
+        'taxAmount': billItems.fold<double>(0, (sum, item) => sum + ((item.sellingPrice * item.quantity) * (item.taxRate ?? 0.0) / 100)),
+        'discount': bill.discount ?? 0.0,
+        'finalTotal': bill.finalTotal,
+        'youSave': bill.discount ?? 0.0,
+      };
 
-                  // Bill Info
-                  pw.Container(
-                    padding: const pw.EdgeInsets.all(10),
-                    decoration: pw.BoxDecoration(
-                      border: pw.Border.all(),
-                      borderRadius: pw.BorderRadius.circular(5),
-                    ),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'Bill ID: ${bill.id}',
-                          style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          'Customer: ${bill.customerName ?? 'N/A'}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                        pw.Text(
-                          'Mobile: ${bill.customerMobile ?? 'N/A'}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                        pw.Text(
-                          'Date: ${bill.date}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
-                  ),
-                  pw.SizedBox(height: 20),
-
-                  // Items Header
-                  pw.Text(
-                    'Items:',
-                    style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                  ),
-                  pw.SizedBox(height: 10),
-
-                  // Items List
-                  pw.Table(
-                    border: pw.TableBorder.all(),
-                    children: [
-                      // Header Row
-                      pw.TableRow(
-                        children: [
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Item', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                      // Item Rows
-                      ...billItems.map((item) {
-                        final itemTotal = item.sellingPrice * item.quantity;
-                        return pw.TableRow(
-                          children: [
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(5),
-                              child: pw.Text(item.itemName),
-                            ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(5),
-                              child: pw.Text('${item.quantity}'),
-                            ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(5),
-                              child: pw.Text('₹${item.sellingPrice.toStringAsFixed(2)}'),
-                            ),
-                            pw.Container(
-                              padding: const pw.EdgeInsets.all(5),
-                              child: pw.Text('₹${itemTotal.toStringAsFixed(2)}'),
-                            ),
-                          ],
-                        );
-                      }),
-                    ],
-                  ),
-                  pw.SizedBox(height: 20),
-
-                  // Summary
-                  pw.Container(
-                    alignment: pw.Alignment.centerRight,
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.end,
-                      children: [
-                        pw.Text(
-                          'Subtotal: ₹${bill.totalAmount.toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 14),
-                        ),
-                        // Note: Tax amount is not stored separately in Bill model
-                        if (bill.discount != null && bill.discount! > 0)
-                          pw.Text(
-                            'Discount: ₹${bill.discount!.toStringAsFixed(2)}',
-                            style: pw.TextStyle(fontSize: 14),
-                          ),
-                        pw.Text(
-                          'Final Total: ₹${bill.finalTotal.toStringAsFixed(2)}',
-                          style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
+      final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+        storeName: storeName,
+        customerName: bill.customerName ?? 'N/A',
+        customerMobile: bill.customerMobile ?? 'N/A',
+        date: bill.date,
+        items: items,
+        summary: summary,
       );
 
       // Save PDF to temporary file
       final output = await getTemporaryDirectory();
       final file = File('${output.path}/bill_${billId}_${DateTime.now().millisecondsSinceEpoch}.pdf');
-      await file.writeAsBytes(await pdf.save());
+      await file.writeAsBytes(pdfBytes);
 
       // Share the PDF file
       await Share.shareXFiles(

@@ -7,6 +7,7 @@ import 'services/i_thermal_printer_service.dart';
 import 'services/thermal_printer_service.dart';
 import 'services/i_settings_service.dart';
 import 'services/print_manager.dart';
+import 'services/pdf_generator_service.dart';
 import 'services/settings_service.dart';
 import 'services/i_scan_service.dart';
 import 'services/scan_service.dart';
@@ -38,7 +39,8 @@ void setupDependencies() {
   getIt.registerSingleton<IEncryptionService>(EncryptionServiceImpl());
   getIt.registerSingleton<IPrintService>(PrintServiceImpl());
   getIt.registerLazySingleton<IThermalPrinterService>(() => ThermalPrinterServiceImpl());
-  getIt.registerSingleton<PrintManager>(PrintManager(getIt<IPrintService>(), getIt<IThermalPrinterService>(), getIt<ISettingsService>()));
+  getIt.registerSingleton<PdfGeneratorService>(PdfGeneratorService());
+  getIt.registerSingleton<PrintManager>(PrintManager(getIt<IPrintService>(), getIt<IThermalPrinterService>(), getIt<ISettingsService>(), getIt<PdfGeneratorService>()));
   getIt.registerSingleton<IScanService>(ScanServiceImpl(getIt<IEncryptionService>(), getIt<ISettingsService>()));
   getIt.registerSingleton<IQrGeneratorService>(QrGeneratorServiceImpl(getIt<IEncryptionService>(), getIt<ISettingsService>()));
 
@@ -52,7 +54,7 @@ void setupDependencies() {
   // Cubits - अब सभी dependencies automatically inject हो जाएँगी
   getIt.registerFactory<SettingsCubit>(() => SettingsCubit(getIt<ISettingsService>()));
   getIt.registerFactory<AnalyticsCubit>(() => AnalyticsCubit(getIt<IBillRepository>(), getIt<IProductRepository>()));
-  getIt.registerFactory<DailySalesCubit>(() => DailySalesCubit(getIt<IBillRepository>(), getIt<ISettingsService>()));
+  getIt.registerFactory<DailySalesCubit>(() => DailySalesCubit(getIt<IBillRepository>(), getIt<ISettingsService>(), getIt<PdfGeneratorService>()));
   getIt.registerFactory<AddProductCubit>(() => AddProductCubit(getIt<IProductRepository>(), getIt<IQrGeneratorService>(), getIt<IEncryptionService>()));
   getIt.registerFactory<QuickScanCubit>(() => QuickScanCubit(getIt<IScanService>()));
   getIt.registerFactory<ProductListCubit>(() => ProductListCubit(getIt<IProductRepository>(), getIt<PrintManager>()));
@@ -69,5 +71,6 @@ void setupDependencies() {
     encryptionService: getIt<IEncryptionService>(),
     settingsService: getIt<ISettingsService>(),
     billRepository: getIt<IBillRepository>(),
+    pdfGeneratorService: getIt<PdfGeneratorService>(),
   ));
 }
