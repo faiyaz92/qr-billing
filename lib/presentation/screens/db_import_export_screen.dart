@@ -191,9 +191,9 @@ class _DbImportExportView extends StatelessWidget {
                     iconColor: const Color(0xFFDC2626),
                     bgColor: const Color(0xFFFEF2F2),
                     title: 'Full Replace',
-                    description: 'Backup ka data aayega, existing data pura delete ho jaayega.\n'
-                        'App ka current data GAYA samjho.',
-                    cautionText: '⚠️  Existing data permanently delete hoga',
+                    description: 'Backup data will be imported, existing data will be completely deleted.\n'
+                        'Your current data will be lost.',
+                    cautionText: '⚠️  Existing data will be permanently deleted',
                     cautionColor: const Color(0xFFDC2626),
                     onTap: () {
                       Navigator.pop(dialogContext);
@@ -215,9 +215,9 @@ class _DbImportExportView extends StatelessWidget {
                     iconColor: const Color(0xFF059669),
                     bgColor: const Color(0xFFECFDF5),
                     title: 'Merge',
-                    description: 'Backup ka naya data add ho jaayega, existing data safe rahega.\n'
-                        'Duplicate records automatically skip ho jaayenge.',
-                    cautionText: '⏱️  Large backups mein time lag sakta hai',
+                    description: 'New data from backup will be added, existing data will remain safe.\n'
+                        'Duplicate records will be skipped automatically.',
+                    cautionText: '⏱️  Large backups may take some time',
                     cautionColor: const Color(0xFF92400E),
                     onTap: () {
                       Navigator.pop(dialogContext);
@@ -897,8 +897,8 @@ class _DbImportExportView extends StatelessWidget {
           SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Import se pehle current data ka backup zaroor lein.\n'
-              'Full Replace mode mein existing data permanently delete ho jaata hai.',
+              'Always take a backup of current data before importing.\n'
+              'In Full Replace mode, existing data is permanently deleted.',
               style: TextStyle(fontSize: 12, color: Color(0xFF92400E), height: 1.5),
             ),
           ),
