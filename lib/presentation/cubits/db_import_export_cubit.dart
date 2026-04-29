@@ -67,6 +67,32 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
     }
   }
 
+  /// Export raw SQLite .db file for specific dates
+  Future<void> exportDatabaseByDate(DateTime start, DateTime end) async {
+    emit(const DbImportExportLoading(message: 'Preparing database...'));
+    try {
+      final filePath = await _importExportService.exportDatabaseByDateRange(start, end);
+      await Share.shareXFiles([XFile(filePath)], subject: 'QR Billing DB Backup (Date Range)');
+      emit(DbExportSuccess(filePath: filePath, format: 'db'));
+      await loadSavedBackups();
+    } catch (e) {
+      emit(DbImportExportError(message: 'Export failed: $e'));
+    }
+  }
+
+  /// Export JSON file for specific dates
+  Future<void> exportAsJsonByDate(DateTime start, DateTime end) async {
+    emit(const DbImportExportLoading(message: 'Preparing JSON...'));
+    try {
+      final filePath = await _importExportService.exportAsJsonByDateRange(start, end);
+      await Share.shareXFiles([XFile(filePath)], subject: 'QR Billing JSON Backup (Date Range)');
+      emit(DbExportSuccess(filePath: filePath, format: 'json'));
+      await loadSavedBackups();
+    } catch (e) {
+      emit(DbImportExportError(message: 'Export failed: $e'));
+    }
+  }
+
   // ─── Download (Save to Device) ─────────────────────────────────────────────
 
   /// Save .db file directly to public Downloads folder
@@ -87,6 +113,32 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
     emit(const DbImportExportLoading(message: 'Saving to Downloads...'));
     try {
       final sourcePath = await _importExportService.exportAsJson();
+      final downloadPath = await _moveToDownloads(sourcePath);
+      emit(DbDownloadSuccess(filePath: downloadPath, format: 'json'));
+      await loadSavedBackups();
+    } catch (e) {
+      emit(DbImportExportError(message: 'Download failed: $e'));
+    }
+  }
+
+  /// Save .db file directly to public Downloads folder for specific dates
+  Future<void> downloadDatabaseByDateToDevice(DateTime start, DateTime end) async {
+    emit(const DbImportExportLoading(message: 'Saving to Downloads...'));
+    try {
+      final sourcePath = await _importExportService.exportDatabaseByDateRange(start, end);
+      final downloadPath = await _moveToDownloads(sourcePath);
+      emit(DbDownloadSuccess(filePath: downloadPath, format: 'db'));
+      await loadSavedBackups();
+    } catch (e) {
+      emit(DbImportExportError(message: 'Download failed: $e'));
+    }
+  }
+
+  /// Save JSON file directly to public Downloads folder for specific dates
+  Future<void> downloadAsJsonByDateToDevice(DateTime start, DateTime end) async {
+    emit(const DbImportExportLoading(message: 'Saving to Downloads...'));
+    try {
+      final sourcePath = await _importExportService.exportAsJsonByDateRange(start, end);
       final downloadPath = await _moveToDownloads(sourcePath);
       emit(DbDownloadSuccess(filePath: downloadPath, format: 'json'));
       await loadSavedBackups();

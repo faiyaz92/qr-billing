@@ -8,6 +8,12 @@ abstract class IDbImportExportService {
   /// Export all data as JSON format
   Future<String> exportAsJson();
 
+  /// Export entire database as a raw SQLite .db file within a specific date range
+  Future<String> exportDatabaseByDateRange(DateTime start, DateTime end);
+
+  /// Export all data as JSON format within a specific date range
+  Future<String> exportAsJsonByDateRange(DateTime start, DateTime end);
+
   /// Create a timestamped auto-backup before import (prevents data loss)
   Future<String> createAutoBackup();
 

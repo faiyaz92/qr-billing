@@ -447,8 +447,77 @@ class _DbImportExportView extends StatelessWidget {
           onDownloadPressed: () => context.read<DbImportExportCubit>().downloadAsJsonToDevice(),
           onSharePressed: () => context.read<DbImportExportCubit>().exportAsJson(),
         ),
+        const SizedBox(height: 12),
+        _buildExportActionCard(
+          icon: Icons.date_range_rounded,
+          iconColor: const Color(0xFFD97706),
+          bgColor: const Color(0xFFFEF3C7),
+          title: 'Timeline Backup (.db)',
+          description: 'Select start and end dates to backup data for a specific period.',
+          badgeText: 'DATE WISE',
+          badgeColor: const Color(0xFFD97706),
+          primaryColor: const Color(0xFFD97706),
+          isLoading: isLoading,
+          onDownloadPressed: () => _pickDateRangeAndExport(context, isJson: false, isDownload: true),
+          onSharePressed: () => _pickDateRangeAndExport(context, isJson: false, isDownload: false),
+        ),
+        const SizedBox(height: 12),
+        _buildExportActionCard(
+          icon: Icons.calendar_month_rounded,
+          iconColor: const Color(0xFF059669),
+          bgColor: const Color(0xFFECFDF5),
+          title: 'Timeline Backup (JSON)',
+          description: 'Select start and end dates to backup JSON data for a specific period.',
+          badgeText: 'DATE WISE',
+          badgeColor: const Color(0xFF059669),
+          primaryColor: const Color(0xFF059669),
+          isLoading: isLoading,
+          onDownloadPressed: () => _pickDateRangeAndExport(context, isJson: true, isDownload: true),
+          onSharePressed: () => _pickDateRangeAndExport(context, isJson: true, isDownload: false),
+        ),
       ],
     );
+  }
+
+  Future<void> _pickDateRangeAndExport(BuildContext context, {required bool isJson, required bool isDownload}) async {
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2050),
+      initialDateRange: DateTimeRange(
+        start: DateTime.now().subtract(const Duration(days: 30)),
+        end: DateTime.now(),
+      ),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF1E40AF),
+              onPrimary: Colors.white,
+              onSurface: Colors.black,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && context.mounted) {
+      final cubit = context.read<DbImportExportCubit>();
+      if (isJson) {
+        if (isDownload) {
+          cubit.downloadAsJsonByDateToDevice(picked.start, picked.end);
+        } else {
+          cubit.exportAsJsonByDate(picked.start, picked.end);
+        }
+      } else {
+        if (isDownload) {
+          cubit.downloadDatabaseByDateToDevice(picked.start, picked.end);
+        } else {
+          cubit.exportDatabaseByDate(picked.start, picked.end);
+        }
+      }
+    }
   }
 
   Widget _buildExportActionCard({

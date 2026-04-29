@@ -59,6 +59,132 @@ class DbImportExportServiceImpl implements IDbImportExportService {
   }
 
   @override
+  Future<String> exportAsJsonByDateRange(DateTime start, DateTime end) async {
+    final db = await _databaseHelper.database;
+    final exportDir = await _getExportDirectory();
+    final startStr = '${_pad(start.day)}${_pad(start.month)}${start.year}';
+    final endStr = '${_pad(end.day)}${_pad(end.month)}${end.year}';
+    final exportPath = join(exportDir.path, 'qr_billing_backup_${startStr}_to_$endStr.json');
+
+    final startIso = start.toIso8601String().split('T')[0];
+    final endIso = end.toIso8601String().split('T')[0];
+
+    final products = await db.query('products');
+    final bills = await db.query('bills', where: 'date >= ? AND date <= ?', whereArgs: [startIso, endIso]);
+    
+    final billIds = bills.map((b) => b['id']).toList();
+    List<Map<String, Object?>> billItems = [];
+    if (billIds.isNotEmpty) {
+      final placeholders = List.filled(billIds.length, '?').join(',');
+      billItems = await db.query('bill_items', where: 'bill_id IN ($placeholders)', whereArgs: billIds);
+    }
+
+    final data = {
+      'version': 1,
+      'exported_at': DateTime.now().toIso8601String(),
+      'tables': {
+        'products': products,
+        'bills': bills,
+        'bill_items': billItems,
+      },
+    };
+
+    final jsonString = const JsonEncoder.withIndent('  ').convert(data);
+    await File(exportPath).writeAsString(jsonString);
+
+    return exportPath;
+  }
+
+  @override
+  Future<String> exportDatabaseByDateRange(DateTime start, DateTime end) async {
+    final sourceDb = await _databaseHelper.database;
+    final exportDir = await _getExportDirectory();
+    final startStr = '${_pad(start.day)}${_pad(start.month)}${start.year}';
+    final endStr = '${_pad(end.day)}${_pad(end.month)}${end.year}';
+    final exportPath = join(exportDir.path, 'qr_billing_backup_${startStr}_to_$endStr.db');
+
+    // Create a new temp db
+    final tempDb = await openDatabase(
+      exportPath,
+      version: 1,
+      onCreate: (db, version) async {
+        await db.execute('''
+          CREATE TABLE products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            brand TEXT,
+            date_of_purchase TEXT,
+            purchase_price REAL NOT NULL,
+            selling_price REAL NOT NULL,
+            original_price REAL,
+            tax REAL,
+            qr_data TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE bills (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            total_amount REAL NOT NULL,
+            discount REAL,
+            final_total REAL NOT NULL,
+            purchase_amount REAL,
+            customer_name TEXT,
+            customer_mobile TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE bill_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bill_id INTEGER NOT NULL,
+            product_id INTEGER,
+            quantity INTEGER NOT NULL,
+            item_discount REAL,
+            purchase_price REAL NOT NULL,
+            selling_price REAL NOT NULL,
+            tax REAL DEFAULT 0.0,
+            item_name TEXT,
+            FOREIGN KEY (bill_id) REFERENCES bills (id),
+            FOREIGN KEY (product_id) REFERENCES products (id)
+          )
+        ''');
+      },
+    );
+
+    // Fetch data
+    final startIso = start.toIso8601String().split('T')[0];
+    final endIso = end.toIso8601String().split('T')[0];
+
+    final products = await sourceDb.query('products');
+    final bills = await sourceDb.query('bills', where: 'date >= ? AND date <= ?', whereArgs: [startIso, endIso]);
+    final billIds = bills.map((b) => b['id']).toList();
+
+    List<Map<String, Object?>> billItems = [];
+    if (billIds.isNotEmpty) {
+      final placeholders = List.filled(billIds.length, '?').join(',');
+      billItems = await sourceDb.query('bill_items', where: 'bill_id IN ($placeholders)', whereArgs: billIds);
+    }
+
+    // Insert into tempDb
+    Batch batch = tempDb.batch();
+    for (var p in products) {
+      batch.insert('products', p);
+    }
+    for (var b in bills) {
+      batch.insert('bills', b);
+    }
+    for (var bi in billItems) {
+      batch.insert('bill_items', bi);
+    }
+    await batch.commit(noResult: true);
+
+    await tempDb.close();
+
+    return exportPath;
+  }
+
+
+  @override
   Future<String> createAutoBackup() async {
     final dbPath = join(await getDatabasesPath(), 'billing.db');
     final dir = await getExternalStorageDirectory() ?? await getApplicationDocumentsDirectory();
