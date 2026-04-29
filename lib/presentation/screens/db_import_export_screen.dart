@@ -804,7 +804,7 @@ class _DbImportExportView extends StatelessWidget {
               context.read<DbImportExportCubit>().deleteBackup(filePath);
             },
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-            child: const Text('Delete'),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),

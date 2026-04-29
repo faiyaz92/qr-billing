@@ -9,7 +9,11 @@ abstract class DbImportExportState extends Equatable {
 
 /// Initial idle state
 class DbImportExportInitial extends DbImportExportState {
-  const DbImportExportInitial();
+  final int timestamp;
+  DbImportExportInitial({int? timestamp}) : timestamp = timestamp ?? DateTime.now().millisecondsSinceEpoch;
+
+  @override
+  List<Object?> get props => [timestamp];
 }
 
 /// Loading — export or import in progress

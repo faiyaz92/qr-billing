@@ -22,7 +22,7 @@ class DbImportExportServiceImpl implements IDbImportExportService {
 
     // Close connection so file is flushed, then copy
     final db = await _databaseHelper.database;
-    await db.execute('PRAGMA wal_checkpoint(FULL)');
+    await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
 
     final sourceFile = File(dbPath);
     await sourceFile.copy(exportPath);
@@ -71,7 +71,7 @@ class DbImportExportServiceImpl implements IDbImportExportService {
     final exportPath = join(exportDir.path, 'qr_billing_autobackup_$exactTime.db');
 
     final db = await _databaseHelper.database;
-    await db.execute('PRAGMA wal_checkpoint(FULL)');
+    await db.rawQuery('PRAGMA wal_checkpoint(FULL)');
 
     final sourceFile = File(dbPath);
     await sourceFile.copy(exportPath);

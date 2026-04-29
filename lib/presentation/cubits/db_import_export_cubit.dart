@@ -11,7 +11,7 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
   
   List<File> savedBackups = [];
 
-  DbImportExportCubit(this._importExportService) : super(const DbImportExportInitial()) {
+  DbImportExportCubit(this._importExportService) : super(DbImportExportInitial()) {
     loadSavedBackups();
   }
 
@@ -22,7 +22,7 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
       savedBackups = await _importExportService.getSavedBackups();
       // Re-emit current state to trigger rebuild with new list
       if (state is DbImportExportInitial) {
-        emit(const DbImportExportInitial());
+        emit(DbImportExportInitial());
       }
     } catch (_) {}
   }
@@ -243,7 +243,7 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
 
   /// Reset back to initial state
   void reset() {
-    emit(const DbImportExportInitial());
+    emit(DbImportExportInitial());
     loadSavedBackups();
   }
 }
