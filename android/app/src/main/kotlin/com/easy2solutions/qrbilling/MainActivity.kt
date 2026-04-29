@@ -1,4 +1,4 @@
-package com.example.qr_based_billing
+package com.easy2solutions.qrbilling
 
 import io.flutter.embedding.android.FlutterActivity
 
