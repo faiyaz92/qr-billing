@@ -257,6 +257,17 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           onTap: () => context.router.push(const AnalyticsRoute()),
                         ),
+                        _buildDashboardCard(
+                          title: 'DB Import/Export',
+                          subtitle: 'Backup & Restore',
+                          icon: Icons.import_export_rounded,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFD97706), Color(0xFFF59E0B)],
+                          ),
+                          onTap: () => context.router.push(const DbImportExportRoute()),
+                        ),
                       ],
                     ),
                   ),

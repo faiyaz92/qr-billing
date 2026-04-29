@@ -16,6 +16,7 @@ import '../domain/repositories/i_product_repository.dart';
 import '../domain/repositories/i_bill_repository.dart';
 import '../data/repositories/product_repository_impl.dart';
 import '../data/repositories/bill_repository_impl.dart';
+import '../data/database_helper.dart';
 import '../presentation/cubits/settings_cubit.dart';
 import '../presentation/cubits/analytics_cubit.dart';
 import '../presentation/cubits/daily_sales_cubit.dart';
@@ -25,6 +26,9 @@ import '../presentation/cubits/product_list_cubit.dart';
 import '../presentation/cubits/home_cubit.dart';
 import '../presentation/cubits/splash_cubit.dart';
 import '../presentation/cubits/billing_cubit.dart';
+import '../core/services/i_db_import_export_service.dart';
+import '../core/services/db_import_export_service.dart';
+import '../presentation/cubits/db_import_export_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -41,6 +45,9 @@ void setupDependencies() {
   // Repositories
   getIt.registerSingleton<IProductRepository>(ProductRepositoryImpl());
   getIt.registerSingleton<IBillRepository>(BillRepositoryImpl());
+  getIt.registerSingleton<IDbImportExportService>(
+    DbImportExportServiceImpl(DatabaseHelper()),
+  );
 
   // Cubits - अब सभी dependencies automatically inject हो जाएँगी
   getIt.registerFactory<SettingsCubit>(() => SettingsCubit(getIt<ISettingsService>()));
@@ -51,6 +58,9 @@ void setupDependencies() {
   getIt.registerFactory<ProductListCubit>(() => ProductListCubit(getIt<IProductRepository>(), getIt<PrintManager>()));
   getIt.registerFactory<HomeCubit>(() => HomeCubit());
   getIt.registerFactory<SplashCubit>(() => SplashCubit());
+  getIt.registerFactory<DbImportExportCubit>(
+    () => DbImportExportCubit(getIt<IDbImportExportService>()),
+  );
 
   // ✅ BillingCubit भी getIt में register करें
   getIt.registerFactory<BillingCubit>(() => BillingCubit(

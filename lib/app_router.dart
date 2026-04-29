@@ -12,6 +12,7 @@ import 'presentation/screens/admin_product_details_screen.dart';
 import 'presentation/screens/analytics_screen.dart';
 import 'presentation/screens/settings_screen.dart';
 import 'presentation/screens/thermal_printer_screen.dart';
+import 'presentation/screens/db_import_export_screen.dart';
 import 'data/models/scanned_data.dart';
 import 'data/models/product.dart';
 
@@ -33,5 +34,6 @@ class AppRouter extends RootStackRouter {
     AutoRoute(page: AnalyticsRoute.page),
     AutoRoute(page: SettingsRoute.page),
     AutoRoute(page: ThermalPrinterRoute.page),
+    AutoRoute(page: DbImportExportRoute.page),
   ];
 }

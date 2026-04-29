@@ -5,11 +5,21 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
 class DatabaseHelper {
-  static final DatabaseHelper _instance = DatabaseHelper._internal();
+  static DatabaseHelper _instance = DatabaseHelper._internal();
   factory DatabaseHelper() => _instance;
   DatabaseHelper._internal();
 
   static Database? _database;
+
+  /// Resets the singleton so next access reopens the DB from disk.
+  /// Call this after replacing the underlying .db file during import.
+  static Future<void> resetInstance() async {
+    if (_database != null) {
+      await _database!.close();
+      _database = null;
+    }
+    _instance = DatabaseHelper._internal();
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;

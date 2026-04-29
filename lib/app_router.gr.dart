@@ -167,6 +167,22 @@ class DailySalesRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [DbImportExportScreen]
+class DbImportExportRoute extends PageRouteInfo<void> {
+  const DbImportExportRoute({List<PageRouteInfo>? children})
+    : super(DbImportExportRoute.name, initialChildren: children);
+
+  static const String name = 'DbImportExportRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const DbImportExportScreen();
+    },
+  );
+}
+
+/// generated route for
 /// [HomeScreen]
 class HomeRoute extends PageRouteInfo<void> {
   const HomeRoute({List<PageRouteInfo>? children})
