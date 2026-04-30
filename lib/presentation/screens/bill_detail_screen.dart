@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../app_router.dart';
 import '../cubits/billing_cubit.dart';
+import '../cubits/billing_state.dart';
 import '../widgets/dialogs/bluetooth_printer_not_connected_dialog.dart';
 
 @RoutePage()

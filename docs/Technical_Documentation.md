@@ -232,6 +232,37 @@ isBillLoss = totalSellingAmount < totalPurchaseAmount
 - `esc_pos_printer: ^4.1.0` - Thermal printing
 - `pdf: ^3.8.4` - PDF generation
 
+### State Management & UI Performance Standards (Fine-Grained Reactivity)
+
+**Rule: No business logic or complex calculations allowed in the UI layer. Use Targeted Rebuilds for high performance.**
+
+#### 1. Selective Rebuilding (`buildWhen`)
+Every `BlocBuilder` must use the `buildWhen` property to prevent unnecessary UI updates. A widget should only rebuild if the specific data it displays has changed.
+
+```dart
+// ✅ GOOD: Selective Rebuild
+BlocBuilder<BillingCubit, BillingState>(
+  buildWhen: (prev, curr) => curr is BillingUpdated && prev.showProfitLossMode != curr.showProfitLossMode,
+  builder: (context, state) => ToggleWidget(active: state.showProfitLossMode),
+)
+```
+
+#### 2. Atomic UI Components (Component Isolation)
+Complex list items or repeating UI blocks must be extracted into separate widgets with their own targeted `BlocBuilder`.
+
+- **Concept**: If Item #5 in a list of 100 updates, only Item #5 should rebuild. Items #1-4 and #6-100 must remain untouched.
+- **Implementation**: Use a separate `StatefulWidget` or `StatelessWidget` for list tiles and wrap their content in a `BlocBuilder` with a specific `buildWhen` condition.
+
+#### 3. State Derivation (Computed Properties)
+Move all math, filtering, and summary logic from UI to the Cubit.
+
+- **Bad**: `final total = state.cart.fold(...)` inside the `build` method.
+- **Good**: `final total = cubit.getSummaryData().total` - UI receives pre-calculated data.
+
+#### 4. Immutability & Predictive Updates
+- Always use `Equatable` for states and models.
+- Use `copyWith` for state transitions to ensure only the intended properties change.
+
 ### Flutter UI Development Guidelines
 
 #### Widget Code Organization
