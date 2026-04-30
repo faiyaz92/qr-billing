@@ -58,26 +58,33 @@ class DailySalesCubit extends Cubit<DailySalesState> {
         for (final bill in dayBills) {
           final items = await _billRepository.getBillItems(bill.id!);
 
-          // Calculate tax from stored bill_items (tax rate + selling price + qty)
+          double billSubtotal = 0.0;
           double billTaxAmount = 0.0;
           double billPurchaseAmount = 0.0;
+
           for (final item in items) {
-            final itemEffectivePrice = item.sellingPrice - (item.itemDiscount ?? 0.0);
-            final itemTotal = itemEffectivePrice * item.quantity;
-            billTaxAmount += itemTotal * ((item.taxRate ?? 0.0) / 100);
+            final sellingPrice = item.sellingPrice;
+            final itemDiscount = item.itemDiscount ?? 0.0;
+            final effectivePrice = sellingPrice - itemDiscount;
+            final itemTotal = effectivePrice * item.quantity;
+            final taxRate = item.taxRate ?? 0.0;
+            
+            billSubtotal += itemTotal;
+            billTaxAmount += itemTotal * (taxRate / 100);
             billPurchaseAmount += item.purchasePrice * item.quantity;
           }
 
-          // Display: total + tax - discount (what customer paid)
-          final billDisplayTotal = bill.totalAmount + billTaxAmount - (bill.discount ?? 0.0);
-          billDisplayTotals[bill.id!] = billDisplayTotal;
-          totalSales += billDisplayTotal;
-          // Profit: selling - discount - purchase (tax excluded — not our money)
-          totalRevenue += bill.totalAmount - (bill.discount ?? 0.0);
+          final finalTotalWithTax = billSubtotal + billTaxAmount - (bill.discount ?? 0.0);
+          
+          billDisplayTotals[bill.id!] = finalTotalWithTax;
+          totalSales += finalTotalWithTax;
+          
+          totalRevenue += billSubtotal - (bill.discount ?? 0.0);
           totalPurchase += billPurchaseAmount;
         }
 
-        final totalProfit = totalRevenue - totalPurchase; // profit without tax ✅
+        final totalProfit = totalRevenue - totalPurchase;
+ // profit without tax ✅
         final profitPercentage = totalPurchase > 0 ? (totalProfit / totalPurchase) * 100 : 0.0;
 
         dailySales.add(DailySales(

@@ -364,7 +364,7 @@ class _DbImportExportView extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Export your database to keep a safe backup. Import it anytime to restore all products, bills, and data.',
                   style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
@@ -776,8 +776,8 @@ class _DbImportExportView extends StatelessWidget {
         child: const Column(
           children: [
             Icon(Icons.history_rounded, size: 40, color: Colors.grey),
-            const SizedBox(height: 12),
-            const Text(
+            SizedBox(height: 12),
+            Text(
               'No saved backups found',
               style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
             ),
@@ -840,13 +840,8 @@ class _DbImportExportView extends StatelessWidget {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.file_download_rounded, color: Color(0xFF0EA5E9)),
-                tooltip: 'Download to device',
-                onPressed: () => cubit.downloadLocalBackupToDevice(file.path),
-              ),
-              IconButton(
-                icon: const Icon(Icons.settings_backup_restore_rounded, color: Color(0xFF1E40AF)),
-                tooltip: 'Import / Restore',
+                icon: const Icon(Icons.download_rounded, color: Color(0xFF1E40AF)),
+                tooltip: 'Import this backup',
                 onPressed: () => cubit.selectBackupFromList(file.path),
               ),
               IconButton(
@@ -899,7 +894,7 @@ class _DbImportExportView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.warning_amber_rounded, color: Color(0xFFD97706), size: 20),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               'Always take a backup of current data before importing.\n'

@@ -228,7 +228,8 @@ class BillingCubit extends Cubit<BillingState> {
 
     final discount = currentState.discount;
     final total = calculateTotal();
-    final finalTotal = total - discount;
+    final taxAmount = calculateTaxAmount();
+    final finalTotal = total + taxAmount - discount;
 
     // Calculate total purchase amount for profit tracking
     final purchaseAmount = _cart.fold(0.0, (sum, item) => sum + (item.product.purchasePrice * item.quantity));

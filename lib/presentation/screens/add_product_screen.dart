@@ -63,100 +63,16 @@ class AddProductScreen extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: BlocBuilder<AddProductCubit, AddProductState>(
+                  buildWhen: (prev, curr) => curr is AddProductSuccess || curr is AddProductError || curr is AddProductInitial,
                   builder: (context, state) {
+                    if (state is AddProductSuccess) {
+                      return _SuccessView(product: product, qrData: state.qrData);
+                    }
+                    
                     return Column(
                       children: [
-                        if (state is AddProductSuccess)
-                          Expanded(
-                            child: Column(
-                              children: [
-                                const Icon(
-                                  Icons.check_circle,
-                                  color: Colors.green,
-                                  size: 64,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  product == null ? 'Product Added Successfully!' : 'Product Updated Successfully!',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'QR Code:',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: QrImageView(
-                                      data: state.qrData,
-                                      size: 200,
-                                      backgroundColor: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'Barcode:',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Card(
-                                  elevation: 4,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: BarcodeWidget(
-                                      barcode: Barcode.code128(),
-                                      data: state.qrData,
-                                      width: double.infinity,
-                                      height: 80,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (state is AddProductError)
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error, color: Colors.red),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Error: ${state.message}',
-                                    style: const TextStyle(color: Colors.red),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        if (state is! AddProductSuccess)
-                          Expanded(child: AddProductForm(product: product)),
+                        if (state is AddProductError) _ErrorView(message: state.message),
+                        Expanded(child: AddProductForm(product: product)),
                       ],
                     );
                   },
@@ -165,6 +81,74 @@ class AddProductScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SuccessView extends StatelessWidget {
+  final Product? product;
+  final String qrData;
+
+  const _SuccessView({required this.product, required this.qrData});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Icon(Icons.check_circle, color: Colors.green, size: 64),
+        const SizedBox(height: 16),
+        Text(
+          product == null ? 'Product Added Successfully!' : 'Product Updated Successfully!',
+          style: const TextStyle(color: Colors.green, fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 20),
+        const Text('QR Code:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: QrImageView(data: qrData, size: 200, backgroundColor: Colors.white),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Text('Barcode:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: BarcodeWidget(barcode: Barcode.code128(), data: qrData, width: double.infinity, height: 80),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  const _ErrorView({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text('Error: $message', style: const TextStyle(color: Colors.red))),
+        ],
       ),
     );
   }

@@ -27,9 +27,8 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<BillingCubit, BillingState>(
-      builder: (context, state) {
-        return Scaffold(
+    final cubit = context.read<BillingCubit>();
+    return Scaffold(
       appBar: AppBar(
         leading: Builder(
           builder: (context) => IconButton(
@@ -42,131 +41,97 @@ class _BillingScreenState extends State<BillingScreen> {
         backgroundColor: const Color(0xFF1E40AF),
         foregroundColor: Colors.white,
         actions: [
-          
-          IconButton(
-            icon: const Icon(Icons.analytics_outlined),
-            onPressed: () => context.read<BillingCubit>().toggleProfitLossMode(),
-            tooltip: 'Toggle Profit/Loss View',
-            color: (state is BillingUpdated && state.showProfitLossMode) ? Colors.orange : null,
+          BlocBuilder<BillingCubit, BillingState>(
+            buildWhen: (prev, curr) => curr is BillingUpdated && (prev is! BillingUpdated || prev.showProfitLossMode != curr.showProfitLossMode),
+            builder: (context, state) {
+              final isProfitLossActive = state is BillingUpdated && state.showProfitLossMode;
+              return IconButton(
+                icon: const Icon(Icons.analytics_outlined),
+                onPressed: () => cubit.toggleProfitLossMode(),
+                tooltip: 'Toggle Profit/Loss View',
+                color: isProfitLossActive ? Colors.orange : null,
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.receipt_long),
             onPressed: () {
+              final summary = cubit.getSummaryData();
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
                 backgroundColor: Colors.transparent,
-                builder: (modalContext) => BlocBuilder<BillingCubit, BillingState>(
-                  builder: (context, state) {
-                    if (state is! BillingUpdated) return const SizedBox.shrink();
-
-                    final updatedState = state;
-
-                    final subtotal = context.read<BillingCubit>().calculateTotal();
-                    final taxAmount = context.read<BillingCubit>().calculateTaxAmount();
-                    final totalPurchase = updatedState.showProfitLossMode
-                        ? updatedState.cart.fold<double>(
-                            0.0,
-                            (sum, item) => sum + (item.product.purchasePrice * item.quantity),
-                          )
-                        : 0.0;
-                    final expectedProfit = subtotal - totalPurchase;
-                    final actualProfit = (subtotal - updatedState.discount) - totalPurchase;
-                    final originalTotal = updatedState.cart.fold<double>(
-                      0.0,
-                      (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
-                    );
-                    final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / (subtotal > 0 ? subtotal : 1)));
-                    final finalTotal = context.read<BillingCubit>().calculateFinalTotal();
-                    final youSave = originalTotalWithTax - finalTotal;
-
-                    return BillSummaryBottomSheet(
-                      data: BillSummaryData(
-                        cart: updatedState.cart,
-                        subtotal: subtotal,
-                        taxAmount: taxAmount,
-                        discount: updatedState.discount,
-                        finalTotal: finalTotal,
-                        totalPurchase: totalPurchase,
-                        expectedProfit: expectedProfit,
-                        actualProfit: actualProfit,
-                        youSave: youSave,
-                        showProfitLossMode: updatedState.showProfitLossMode,
-                        isEditMode: updatedState.isEditMode,
-                        customerName: updatedState.customerName,
-                        customerMobile: updatedState.customerMobile,
-                      ),
-                      onCustomerNameChanged: (value) => context.read<BillingCubit>().setCustomerName(value),
-                      onCustomerMobileChanged: (value) => context.read<BillingCubit>().setCustomerMobile(value),
-                      onDiscountChanged: (value) => context.read<BillingCubit>().setDiscount(value),
-                      onPrintBill: () async {
-                        try {
-                          await context.read<BillingCubit>().printBill();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Bill printed successfully')),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            if (e.toString().contains('BLUETOOTH_PRINTER_NOT_CONNECTED')) {
-                              showDialog(
-                                context: context,
-                                builder: (_) => const BluetoothPrinterNotConnectedDialog(),
-                              );
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Print failed: $e')),
-                              );
-                            }
-                          }
+                builder: (modalContext) => BillSummaryBottomSheet(
+                  data: summary,
+                  onCustomerNameChanged: (value) => cubit.setCustomerName(value),
+                  onCustomerMobileChanged: (value) => cubit.setCustomerMobile(value),
+                  onDiscountChanged: (value) => cubit.setDiscount(value),
+                  onPrintBill: () async {
+                    try {
+                      await cubit.printBill();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Bill printed successfully')),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        if (e.toString().contains('BLUETOOTH_PRINTER_NOT_CONNECTED')) {
+                          showDialog(
+                            context: context,
+                            builder: (_) => const BluetoothPrinterNotConnectedDialog(),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Print failed: $e')),
+                          );
                         }
-                      },
-                      onSaveBill: () async {
-                        try {
-                          await context.read<BillingCubit>().saveBill();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Bill updated successfully'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to update bill: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                      onMarkBillAsPaid: () async {
-                        try {
-                          await context.read<BillingCubit>().markBillAsPaid();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Bill marked as paid successfully'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to mark bill as paid: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-                      },
-                    );
+                      }
+                    }
+                  },
+                  onSaveBill: () async {
+                    try {
+                      await cubit.saveBill();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bill updated successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to update bill: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  onMarkBillAsPaid: () async {
+                    try {
+                      await cubit.markBillAsPaid();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Bill marked as paid successfully'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to mark bill as paid: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
                   },
                 ),
               );
@@ -257,30 +222,29 @@ class _BillingScreenState extends State<BillingScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFF8FAFC),
-                Color(0xFFF1F5F9),
-              ],
+              colors: [Color(0xFFF8FAFC), Color(0xFFF1F5F9)],
             ),
           ),
           child: Column(
             children: [
-              // Cart (Full screen now)
-              const Expanded(
-                child: CartWidget(),
+              Expanded(
+                child: BlocBuilder<BillingCubit, BillingState>(
+                  buildWhen: (prev, curr) => curr is BillingUpdated && (prev is! BillingUpdated || prev.cart != curr.cart),
+                  builder: (context, state) => const CartWidget(),
+                ),
               ),
             ],
           ),
         ),
       ),
       floatingActionButton: BlocBuilder<BillingCubit, BillingState>(
+        buildWhen: (prev, curr) => 
+            curr is BillingUpdated && (prev is! BillingUpdated || prev.isEditMode != curr.isEditMode),
         builder: (context, state) {
           if (state is BillingUpdated && !state.isEditMode) {
-            final updatedState = state;
             return Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Quick Add Product Button - More Prominent
                 Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: FloatingActionButton.extended(
@@ -297,7 +261,6 @@ class _BillingScreenState extends State<BillingScreen> {
                     elevation: 6,
                   ),
                 ),
-                // Scan Button
                 FloatingActionButton(
                   heroTag: 'scan_fab',
                   onPressed: () => showDialog(
@@ -306,7 +269,7 @@ class _BillingScreenState extends State<BillingScreen> {
                     builder: (_) => ContinuousScanDialog(
                       onProductScanned: (code) async {
                         try {
-                          await context.read<BillingCubit>().scanProduct(code, continuousScan: true);
+                          await cubit.scanProduct(code, continuousScan: true);
                         } catch (e) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -330,8 +293,6 @@ class _BillingScreenState extends State<BillingScreen> {
         },
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        );
-      }
     );
   }
 }
