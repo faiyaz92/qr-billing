@@ -33,7 +33,7 @@ class BillSummaryData {
   });
 }
 
-class BillSummaryBottomSheet extends StatelessWidget {
+class BillSummaryBottomSheet extends StatefulWidget {
   final BillSummaryData data;
   final ValueChanged<String> onCustomerNameChanged;
   final ValueChanged<String> onCustomerMobileChanged;
@@ -52,6 +52,33 @@ class BillSummaryBottomSheet extends StatelessWidget {
     required this.onSaveBill,
     required this.onMarkBillAsPaid,
   });
+
+  @override
+  State<BillSummaryBottomSheet> createState() => _BillSummaryBottomSheetState();
+}
+
+class _BillSummaryBottomSheetState extends State<BillSummaryBottomSheet> {
+  late TextEditingController _nameController;
+  late TextEditingController _mobileController;
+  late TextEditingController _discountController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.data.customerName);
+    _mobileController = TextEditingController(text: widget.data.customerMobile);
+    _discountController = TextEditingController(
+      text: widget.data.discount > 0 ? widget.data.discount.toStringAsFixed(2) : '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _mobileController.dispose();
+    _discountController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -111,23 +138,24 @@ class BillSummaryBottomSheet extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     TextField(
-                      controller: TextEditingController(text: data.customerName),
+                      controller: _nameController,
                       decoration: const InputDecoration(
                         labelText: 'Customer Name (Optional)',
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      onChanged: onCustomerNameChanged,
+                      onChanged: widget.onCustomerNameChanged,
                     ),
                     const SizedBox(height: 8),
                     TextField(
-                      controller: TextEditingController(text: data.customerMobile),
+                      controller: _mobileController,
                       decoration: const InputDecoration(
                         labelText: 'Customer Mobile',
                         border: OutlineInputBorder(),
                         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      onChanged: onCustomerMobileChanged,
+                      keyboardType: TextInputType.phone,
+                      onChanged: widget.onCustomerMobileChanged,
                     ),
                   ],
                 ),
@@ -158,18 +186,18 @@ class BillSummaryBottomSheet extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const Text('Subtotal:'),
-                        Text('₹${data.subtotal.toStringAsFixed(2)}'),
+                        Text('₹${widget.data.subtotal.toStringAsFixed(2)}'),
                       ],
                     ),
                     const SizedBox(height: 8),
                     // Total Tax
-                    if (data.taxAmount > 0) ...[
+                    if (widget.data.taxAmount > 0) ...[
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Tax:', style: TextStyle(color: Colors.blue)),
                           Text(
-                            '₹${data.taxAmount.toStringAsFixed(2)}',
+                            '₹${widget.data.taxAmount.toStringAsFixed(2)}',
                             style: const TextStyle(color: Colors.blue),
                           ),
                         ],
@@ -180,13 +208,13 @@ class BillSummaryBottomSheet extends StatelessWidget {
                         children: [
                           const Text('Total with Tax:', style: TextStyle(color: Colors.teal, fontWeight: FontWeight.w500)),
                           Text(
-                            '₹${(data.subtotal + data.taxAmount).toStringAsFixed(2)}',
+                            '₹${(widget.data.subtotal + widget.data.taxAmount).toStringAsFixed(2)}',
                             style: const TextStyle(color: Colors.teal, fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
                     ],
-                    if (data.showProfitLossMode) ...[
+                    if (widget.data.showProfitLossMode) ...[
                       const SizedBox(height: 8),
                       // Total Purchase Cost
                       Row(
@@ -194,7 +222,7 @@ class BillSummaryBottomSheet extends StatelessWidget {
                         children: [
                           const Text('Total Cost:', style: TextStyle(color: Colors.blue)),
                           Text(
-                            '₹${data.totalPurchase.toStringAsFixed(2)}',
+                            '₹${widget.data.totalPurchase.toStringAsFixed(2)}',
                             style: const TextStyle(color: Colors.blue),
                           ),
                         ],
@@ -206,9 +234,9 @@ class BillSummaryBottomSheet extends StatelessWidget {
                         children: [
                           const Text('Expected Profit:', style: TextStyle(color: Colors.purple)),
                           Text(
-                            '₹${data.expectedProfit.toStringAsFixed(2)}',
+                            '₹${widget.data.expectedProfit.toStringAsFixed(2)}',
                             style: TextStyle(
-                              color: data.expectedProfit >= 0 ? Colors.green : Colors.red,
+                              color: widget.data.expectedProfit >= 0 ? Colors.green : Colors.red,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -230,18 +258,18 @@ class BillSummaryBottomSheet extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: TextField(
-                            controller: TextEditingController(text: data.discount.toStringAsFixed(2)),
+                            controller: _discountController,
                             textAlign: TextAlign.right,
                             decoration: const InputDecoration(
                               hintText: '0.00',
                               border: OutlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
-                            keyboardType: TextInputType.number,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
                             onChanged: (value) {
                               final discount = double.tryParse(value) ?? 0.0;
-                              final maxDiscount = data.subtotal + data.taxAmount;
-                              onDiscountChanged(discount > maxDiscount ? maxDiscount : discount);
+                              final maxDiscount = widget.data.subtotal + widget.data.taxAmount;
+                              widget.onDiscountChanged(discount > maxDiscount ? maxDiscount : discount);
                             },
                           ),
                         ),
@@ -261,11 +289,11 @@ class BillSummaryBottomSheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '₹${data.finalTotal.toStringAsFixed(2)}',
+                          '₹${widget.data.finalTotal.toStringAsFixed(2)}',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: data.showProfitLossMode && data.finalTotal < data.totalPurchase ? Colors.orange : Colors.green,
+                            color: widget.data.showProfitLossMode && widget.data.finalTotal < widget.data.totalPurchase ? Colors.orange : Colors.green,
                           ),
                         ),
                       ],
@@ -284,7 +312,7 @@ class BillSummaryBottomSheet extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '₹${data.youSave.toStringAsFixed(2)}',
+                          '₹${widget.data.youSave.toStringAsFixed(2)}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -293,29 +321,29 @@ class BillSummaryBottomSheet extends StatelessWidget {
                         ),
                       ],
                     ),
-                    if (data.showProfitLossMode) ...[
+                    if (widget.data.showProfitLossMode) ...[
                       const SizedBox(height: 8),
                       // Actual Profit/Loss after discount
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            data.actualProfit < 0 ? 'Loss:' : 'Profit:',
+                            widget.data.actualProfit < 0 ? 'Loss:' : 'Profit:',
                             style: TextStyle(
-                              color: data.actualProfit < 0 ? Colors.red : Colors.green,
+                              color: widget.data.actualProfit < 0 ? Colors.red : Colors.green,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                           Text(
-                            '₹${data.actualProfit.toStringAsFixed(2)}',
+                            '₹${widget.data.actualProfit.toStringAsFixed(2)}',
                             style: TextStyle(
-                              color: data.actualProfit < 0 ? Colors.red : Colors.green,
+                              color: widget.data.actualProfit < 0 ? Colors.red : Colors.green,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
-                      if (data.discount > 0) ...[
+                      if (widget.data.discount > 0) ...[
                         const SizedBox(height: 4),
                         const Text(
                           '⚠️ High discount may result in loss!',
@@ -340,7 +368,7 @@ class BillSummaryBottomSheet extends StatelessWidget {
                     child: ElevatedButton.icon(
                       onPressed: () {
                         Navigator.pop(context); // Close bottom sheet
-                        onPrintBill();
+                        widget.onPrintBill();
                       },
                       icon: const Icon(Icons.print),
                       label: const Text('Print Bill'),
@@ -355,17 +383,17 @@ class BillSummaryBottomSheet extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        if (data.isEditMode) {
-                          onSaveBill();
+                        if (widget.data.isEditMode) {
+                          widget.onSaveBill();
                         } else {
-                          onMarkBillAsPaid();
+                          widget.onMarkBillAsPaid();
                         }
                         Navigator.pop(context); // Close bottom sheet after operations complete
                       },
                       icon: const Icon(Icons.payment),
-                      label: Text(data.isEditMode ? 'Update Bill' : 'Paid Bill'),
+                      label: Text(widget.data.isEditMode ? 'Update Bill' : 'Paid Bill'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: data.isEditMode ? Colors.orange : Colors.green,
+                        backgroundColor: widget.data.isEditMode ? Colors.orange : Colors.green,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
