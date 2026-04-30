@@ -176,14 +176,23 @@ class BillDetailScreen extends StatelessWidget {
                                                     overflow: TextOverflow.ellipsis,
                                                   ),
                                                 ),
-                                                Text(
-                                                  '₹${finalPrice.toStringAsFixed(2)}',
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w500,
-                                                    color: Colors.grey,
+                                                if (item.itemDiscount > 0)
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.orange[50],
+                                                      borderRadius: BorderRadius.circular(4),
+                                                      border: Border.all(color: Colors.orange[200]!),
+                                                    ),
+                                                    child: Text(
+                                                      'OFF ₹${(item.itemDiscount * item.quantity).toStringAsFixed(0)}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: Colors.orange[800],
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
                                               ],
                                             ),
                                             const SizedBox(height: 8),
@@ -197,6 +206,16 @@ class BillDetailScreen extends StatelessWidget {
                                                   ),
                                                 ),
                                                 const Spacer(),
+                                                if (item.itemDiscount > 0)
+                                                  Text(
+                                                    '₹${(sellingPrice * item.quantity).toStringAsFixed(2)}',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.grey,
+                                                      decoration: TextDecoration.lineThrough,
+                                                    ),
+                                                  ),
+                                                const SizedBox(width: 8),
                                                 Text(
                                                   '₹${finalPrice.toStringAsFixed(2)}',
                                                   style: const TextStyle(
@@ -217,9 +236,20 @@ class BillDetailScreen extends StatelessWidget {
                                                     fontSize: 12,
                                                   ),
                                                 ),
+                                                if (item.itemDiscount > 0) ...[
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '(-₹${item.itemDiscount.toStringAsFixed(0)})',
+                                                    style: const TextStyle(
+                                                      color: Colors.orange,
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                ],
                                                 const Spacer(),
                                                 Text(
-                                                  '₹${(sellingPrice * item.quantity).toStringAsFixed(2)}',
+                                                  '₹${finalPrice.toStringAsFixed(2)}',
                                                   style: const TextStyle(
                                                     color: Colors.green,
                                                     fontSize: 14,
