@@ -128,10 +128,12 @@ class BillDetailScreen extends StatelessWidget {
                             child: ListView.builder(
                               itemCount: state.cart.length,
                               itemBuilder: (context, index) {
-                                final item = state.cart[index];
-                                final data = item.data.data;
-                                final sellingPrice = double.tryParse(data['selling_price']?.toString() ?? '0') ?? 0.0;
-                                final finalPrice = (sellingPrice - item.itemDiscount) * item.quantity;
+                                 final item = state.cart[index];
+                                 final data = item.data.data;
+                                 final sellingPrice = double.tryParse(data['selling_price']?.toString() ?? '0') ?? 0.0;
+                                 final itemTotalBeforeTax = (sellingPrice - item.itemDiscount) * item.quantity;
+                                 final taxAmount = itemTotalBeforeTax * ((item.product.tax ?? 0.0) / 100);
+                                 final finalPrice = itemTotalBeforeTax + taxAmount;
 
                                 return Container(
                                   margin: const EdgeInsets.only(bottom: 8),
@@ -207,50 +209,77 @@ class BillDetailScreen extends StatelessWidget {
                                                   ),
                                                 ),
                                                 const Spacer(),
-                                                if (item.itemDiscount > 0)
-                                                  Text(
-                                                    '₹${(sellingPrice * item.quantity).toStringAsFixed(2)}',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey,
-                                                      decoration: TextDecoration.lineThrough,
+                                                // Price Hierarchy: MRP -> Selling -> Final
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                                  children: [
+                                                    Row(
+                                                      children: [
+                                                        if (item.product.originalPrice != null && item.product.originalPrice! > sellingPrice)
+                                                          Padding(
+                                                            padding: const EdgeInsets.only(right: 8),
+                                                            child: Text(
+                                                              'MRP: ₹${item.product.originalPrice!.toStringAsFixed(0)}',
+                                                              style: const TextStyle(
+                                                                fontSize: 11,
+                                                                color: Colors.grey,
+                                                                decoration: TextDecoration.lineThrough,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        if (item.itemDiscount > 0)
+                                                          Text(
+                                                            'Sell: ₹${sellingPrice.toStringAsFixed(0)}',
+                                                            style: const TextStyle(
+                                                              fontSize: 11,
+                                                              color: Colors.orange,
+                                                              decoration: TextDecoration.lineThrough,
+                                                            ),
+                                                          ),
+                                                      ],
                                                     ),
-                                                  ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  '₹${finalPrice.toStringAsFixed(2)}',
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: Color(0xFF1E40AF),
-                                                  ),
+                                                    Row(
+                                                      children: [
+                                                        if (item.product.tax != null && item.product.tax! > 0)
+                                                          Padding(
+                                                            padding: const EdgeInsets.only(right: 8),
+                                                            child: Text(
+                                                              'Tax: ${item.product.tax!.toStringAsFixed(0)}% (₹${(finalPrice - (itemTotalBeforeTax)).toStringAsFixed(1)})',
+                                                              style: const TextStyle(
+                                                                fontSize: 10,
+                                                                color: Colors.blueGrey,
+                                                                fontWeight: FontWeight.w500,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        Text(
+                                                          '₹${(finalPrice / item.quantity).toStringAsFixed(2)}',
+                                                          style: const TextStyle(
+                                                            fontSize: 15,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: Color(0xFF1E40AF),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    Text(
+                                                      'Excl. Tax: ₹${(itemTotalBeforeTax / item.quantity).toStringAsFixed(2)}',
+                                                      style: TextStyle(
+                                                        fontSize: 10,
+                                                        color: Colors.grey[600],
+                                                        fontStyle: FontStyle.italic,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
                                               ],
                                             ),
                                             const SizedBox(height: 4),
                                             Row(
                                               children: [
-                                                Text(
-                                                  '₹${sellingPrice.toStringAsFixed(0)} × ${item.quantity}',
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                if (item.itemDiscount > 0) ...[
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    '(-₹${item.itemDiscount.toStringAsFixed(0)})',
-                                                    style: const TextStyle(
-                                                      color: Colors.orange,
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                  ),
-                                                ],
                                                 const Spacer(),
                                                 Text(
-                                                  '₹${finalPrice.toStringAsFixed(2)}',
+                                                  'Subtotal: ₹${finalPrice.toStringAsFixed(2)}',
                                                   style: const TextStyle(
                                                     color: Colors.green,
                                                     fontSize: 14,

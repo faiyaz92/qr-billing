@@ -180,12 +180,26 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       final storeName = await _settingsService.getStoreName() ?? 'Store';
 
       // Generate PDF using centralized service
-      final items = billItems.map((item) => {
-        'name': item.itemName ?? 'Unknown',
-        'quantity': item.quantity,
-        'price': item.sellingPrice,
-        'total': item.sellingPrice * item.quantity,
-        'discount': item.itemDiscount ?? 0.0,
+      final items = billItems.map((item) {
+        final sellingPrice = item.sellingPrice;
+        final discount = item.itemDiscount ?? 0.0;
+        final effectivePrice = sellingPrice - discount;
+        final itemTotalBeforeTax = effectivePrice * item.quantity;
+        final taxRate = item.taxRate ?? 0.0;
+        final taxAmount = itemTotalBeforeTax * (taxRate / 100);
+        final itemTotalAfterTax = itemTotalBeforeTax + taxAmount;
+
+        return {
+          'name': item.itemName ?? 'Unknown',
+          'quantity': item.quantity,
+          'mrp': item.originalPrice ?? sellingPrice,
+          'price': sellingPrice,
+          'discount': discount,
+          'amtExclTax': itemTotalBeforeTax,
+          'taxRate': taxRate,
+          'taxAmount': taxAmount,
+          'total': itemTotalAfterTax,
+        };
       }).toList();
 
       // Calculate Rock Solid savings for PDF

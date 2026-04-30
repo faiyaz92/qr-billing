@@ -373,13 +373,24 @@ class BillingCubit extends Cubit<BillingState> {
     final summary = getSummaryData();
 
     final items = _cart.map((item) {
-      final itemTotal = (item.product.sellingPrice - item.itemDiscount) * item.quantity;
+      final sellingPrice = item.product.sellingPrice;
+      final discount = item.itemDiscount;
+      final effectivePrice = sellingPrice - discount;
+      final itemTotalBeforeTax = effectivePrice * item.quantity;
+      final taxRate = item.product.tax ?? 0.0;
+      final taxAmount = itemTotalBeforeTax * (taxRate / 100);
+      final itemTotalAfterTax = itemTotalBeforeTax + taxAmount;
+
       return {
         'name': item.product.name,
         'quantity': item.quantity,
-        'price': item.product.sellingPrice,
-        'total': itemTotal,
-        'discount': item.itemDiscount,
+        'mrp': item.product.originalPrice ?? sellingPrice,
+        'price': sellingPrice,
+        'discount': discount,
+        'amtExclTax': itemTotalBeforeTax, // Price after discount, before tax
+        'taxRate': taxRate,
+        'taxAmount': taxAmount,
+        'total': itemTotalAfterTax, // Item total including tax
       };
     }).toList();
 
