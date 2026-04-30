@@ -266,6 +266,7 @@ class BillingCubit extends Cubit<BillingState> {
         itemDiscount: item.itemDiscount, // Use actual item discount
         purchasePrice: item.product.purchasePrice,
         sellingPrice: item.product.sellingPrice,
+        originalPrice: item.product.originalPrice, // Save original price (MRP)
         taxRate: item.product.tax ?? 0.0,
       );
       await _billRepository.insertBillItem(billItem);
@@ -481,7 +482,7 @@ class BillingCubit extends Cubit<BillingState> {
         brand: brand,
         sellingPrice: item.sellingPrice,
         purchasePrice: item.purchasePrice,
-        originalPrice: null,
+        originalPrice: item.originalPrice, // Restore original price (MRP)
         tax: taxRate,
         qrData: null,
       );
@@ -533,8 +534,15 @@ class BillingCubit extends Cubit<BillingState> {
 
   double calculateYouSave() {
     final originalTotal = _cart.fold(0.0, (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity));
+    final subtotal = calculateTotal();
     final taxAmount = calculateTaxAmount();
-    return originalTotal + taxAmount - calculateFinalTotal();
+    
+    // Estimate tax on MRP using the average tax rate of current items
+    final taxRate = subtotal > 0 ? (taxAmount / subtotal) : 0.0;
+    final originalTotalWithTax = originalTotal + (originalTotal * taxRate);
+    
+    final finalTotal = calculateFinalTotal();
+    return originalTotalWithTax - finalTotal;
   }
 
   // Temporary method for testing in emulator - adds dummy products to cart

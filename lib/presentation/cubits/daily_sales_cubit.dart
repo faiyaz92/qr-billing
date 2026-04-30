@@ -62,7 +62,8 @@ class DailySalesCubit extends Cubit<DailySalesState> {
           double billTaxAmount = 0.0;
           double billPurchaseAmount = 0.0;
           for (final item in items) {
-            final itemTotal = item.sellingPrice * item.quantity;
+            final itemEffectivePrice = item.sellingPrice - (item.itemDiscount ?? 0.0);
+            final itemTotal = itemEffectivePrice * item.quantity;
             billTaxAmount += itemTotal * ((item.taxRate ?? 0.0) / 100);
             billPurchaseAmount += item.purchasePrice * item.quantity;
           }
@@ -187,13 +188,22 @@ class DailySalesCubit extends Cubit<DailySalesState> {
         'discount': item.itemDiscount ?? 0.0,
       }).toList();
 
+      // Calculate Rock Solid savings for PDF
+      final subtotal = bill.totalAmount;
+      final taxAmount = billItems.fold<double>(0, (sum, item) => sum + (((item.sellingPrice - (item.itemDiscount ?? 0.0)) * item.quantity) * (item.taxRate ?? 0.0) / 100));
+      final taxRate = subtotal > 0 ? (taxAmount / subtotal) : 0.0;
+      // Now using stored originalPrice (MRP) from database
+      final originalTotal = billItems.fold<double>(0, (sum, item) => sum + ((item.originalPrice ?? item.sellingPrice) * item.quantity));
+      final originalTotalWithTax = originalTotal + (originalTotal * taxRate);
+      final youSave = originalTotalWithTax - bill.finalTotal;
+
       final summary = {
-        'subtotal': bill.totalAmount,
-        'totalItemDiscounts': 0.0,
-        'taxAmount': billItems.fold<double>(0, (sum, item) => sum + ((item.sellingPrice * item.quantity) * (item.taxRate ?? 0.0) / 100)),
+        'subtotal': subtotal,
+        'totalItemDiscounts': billItems.fold<double>(0, (sum, item) => sum + ((item.itemDiscount ?? 0.0) * item.quantity)),
+        'taxAmount': taxAmount,
         'discount': bill.discount ?? 0.0,
         'finalTotal': bill.finalTotal,
-        'youSave': bill.discount ?? 0.0,
+        'youSave': youSave,
       };
 
       final pdfBytes = await _pdfGeneratorService.generateBillPdf(

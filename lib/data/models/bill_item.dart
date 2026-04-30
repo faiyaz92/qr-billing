@@ -7,7 +7,7 @@ class BillItem {
   final double? itemDiscount;
   final double purchasePrice; // Added for profit calculation
   final double sellingPrice; // Added for profit calculation
-
+  final double? originalPrice; // Added for savings calculation
   final double? taxRate; // Added for tax calculation (percentage)
 
   BillItem({
@@ -19,6 +19,7 @@ class BillItem {
     this.itemDiscount,
     required this.purchasePrice, // Required for profit tracking
     required this.sellingPrice, // Required for profit tracking
+    this.originalPrice, // Optional for savings tracking
     this.taxRate, // Optional for tax calculation
   });
 
@@ -32,13 +33,13 @@ class BillItem {
       'item_discount': itemDiscount,
       'purchase_price': purchasePrice,
       'selling_price': sellingPrice,
+      'original_price': originalPrice,
       'tax': taxRate,
     };
   }
 
   factory BillItem.fromMap(Map<String, dynamic> map) {
-    print('Parsing BillItem from map: $map');
-    final item = BillItem(
+    return BillItem(
       id: map['id'],
       billId: map['bill_id'],
       productId: map['product_id'],
@@ -47,9 +48,8 @@ class BillItem {
       itemDiscount: map['item_discount'],
       purchasePrice: map['purchase_price'] ?? 0.0,
       sellingPrice: map['selling_price'] ?? 0.0,
+      originalPrice: map['original_price'],
       taxRate: map['tax'] ?? 0.0,
     );
-    print('Parsed BillItem: id=${item.id}, productId=${item.productId}, itemName=${item.itemName}, taxRate=${item.taxRate}');
-    return item;
   }
 }

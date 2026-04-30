@@ -31,10 +31,17 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'billing.db');
     Database db = await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
     return db;
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE bill_items ADD COLUMN original_price REAL');
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -72,6 +79,7 @@ class DatabaseHelper {
         item_discount REAL,
         purchase_price REAL NOT NULL,
         selling_price REAL NOT NULL,
+        original_price REAL,
         tax REAL DEFAULT 0.0,
         item_name TEXT,
         FOREIGN KEY (bill_id) REFERENCES bills (id),

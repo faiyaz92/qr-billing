@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../app_router.dart';
 import '../../core/injection.dart';
 import '../cubits/billing_cubit.dart';
+import '../cubits/billing_state.dart';
 import '../cubits/add_product_cubit.dart';
 import '../widgets/dialogs/print_bill_dialog.dart';
 import '../widgets/dialogs/continuous_scan_dialog.dart';
@@ -59,17 +60,19 @@ class _BillingScreenState extends State<BillingScreen> {
                   builder: (context, state) {
                     if (state is! BillingUpdated) return const SizedBox.shrink();
 
+                    final updatedState = state;
+
                     final subtotal = context.read<BillingCubit>().calculateTotal();
                     final taxAmount = context.read<BillingCubit>().calculateTaxAmount();
-                    final totalPurchase = state.showProfitLossMode
-                        ? state.cart.fold<double>(
+                    final totalPurchase = updatedState.showProfitLossMode
+                        ? updatedState.cart.fold<double>(
                             0.0,
                             (sum, item) => sum + (item.product.purchasePrice * item.quantity),
                           )
                         : 0.0;
                     final expectedProfit = subtotal - totalPurchase;
-                    final actualProfit = (subtotal - state.discount) - totalPurchase;
-                    final originalTotal = state.cart.fold<double>(
+                    final actualProfit = (subtotal - updatedState.discount) - totalPurchase;
+                    final originalTotal = updatedState.cart.fold<double>(
                       0.0,
                       (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
                     );
@@ -79,19 +82,19 @@ class _BillingScreenState extends State<BillingScreen> {
 
                     return BillSummaryBottomSheet(
                       data: BillSummaryData(
-                        cart: state.cart,
+                        cart: updatedState.cart,
                         subtotal: subtotal,
                         taxAmount: taxAmount,
-                        discount: state.discount,
+                        discount: updatedState.discount,
                         finalTotal: finalTotal,
                         totalPurchase: totalPurchase,
                         expectedProfit: expectedProfit,
                         actualProfit: actualProfit,
                         youSave: youSave,
-                        showProfitLossMode: state.showProfitLossMode,
-                        isEditMode: state.isEditMode,
-                        customerName: state.customerName,
-                        customerMobile: state.customerMobile,
+                        showProfitLossMode: updatedState.showProfitLossMode,
+                        isEditMode: updatedState.isEditMode,
+                        customerName: updatedState.customerName,
+                        customerMobile: updatedState.customerMobile,
                       ),
                       onCustomerNameChanged: (value) => context.read<BillingCubit>().setCustomerName(value),
                       onCustomerMobileChanged: (value) => context.read<BillingCubit>().setCustomerMobile(value),
@@ -121,7 +124,7 @@ class _BillingScreenState extends State<BillingScreen> {
                       },
                       onSaveBill: () async {
                         try {
-                          await context.read<BillingCubit>().saveBill(state.discount);
+                          await context.read<BillingCubit>().saveBill();
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -237,10 +240,11 @@ class _BillingScreenState extends State<BillingScreen> {
       body: BlocListener<BillingCubit, BillingState>(
         listener: (context, state) {
           if (state is BillingUpdated) {
-            if (state.duplicateDetected && state.duplicateProductName != null) {
+            final updatedState = state;
+            if (updatedState.duplicateDetected && updatedState.duplicateProductName != null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('${state.duplicateProductName} is already in cart'),
+                  content: Text('${updatedState.duplicateProductName} is already in cart'),
                   duration: const Duration(seconds: 2),
                   backgroundColor: Colors.orange,
                 ),
@@ -272,6 +276,7 @@ class _BillingScreenState extends State<BillingScreen> {
       floatingActionButton: BlocBuilder<BillingCubit, BillingState>(
         builder: (context, state) {
           if (state is BillingUpdated && !state.isEditMode) {
+            final updatedState = state;
             return Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
