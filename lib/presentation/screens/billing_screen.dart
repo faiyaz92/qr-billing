@@ -1,12 +1,9 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../app_router.dart';
-import '../../core/injection.dart';
 import '../cubits/billing_cubit.dart';
 import '../cubits/billing_state.dart';
-import '../cubits/add_product_cubit.dart';
 import '../widgets/dialogs/print_bill_dialog.dart';
 import '../widgets/dialogs/continuous_scan_dialog.dart';
 import '../widgets/dialogs/bill_summary_bottom_sheet.dart';
