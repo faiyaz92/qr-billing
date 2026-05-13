@@ -419,7 +419,7 @@ class BillingCubit extends Cubit<BillingState> {
       storeName: storeName,
       customerName: currentState.customerName ?? 'N/A',
       customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
+      date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
       items: reportData['items'] as List<Map<String, dynamic>>,
       summary: reportData['summary'] as Map<String, dynamic>,
     );
@@ -447,7 +447,7 @@ class BillingCubit extends Cubit<BillingState> {
       storeName: storeName,
       customerName: currentState.customerName ?? 'N/A',
       customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
+      date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
       items: reportData['items'] as List<Map<String, dynamic>>,
       summary: reportData['summary'] as Map<String, dynamic>,
     );
@@ -520,7 +520,8 @@ class BillingCubit extends Cubit<BillingState> {
       customerName: bill.customerName, 
       customerMobile: bill.customerMobile, 
       showProfitLossMode: _showProfitLossMode, 
-      isEditMode: _isEditMode
+      isEditMode: _isEditMode,
+      billDate: bill.date,
     ));
   }
 
@@ -630,48 +631,37 @@ class BillingCubit extends Cubit<BillingState> {
   Future<void> shareBillPdf() async {
     final currentState = state as BillingUpdated;
 
-    // Save bill before sharing (will update if already exists)
-    await saveBill();
+    try {
+      // Save bill before sharing (will update if already exists)
+      await saveBill();
 
-    // Get store name
-    final storeName = await _settingsService.getStoreName() ?? 'Store';
+      // Get store name
+      final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-    // Generate PDF using centralized service
-    final items = _cart.map((item) => {
-      'name': item.data.data['name'] ?? 'Unknown',
-      'quantity': item.quantity,
-      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
-      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
-      'discount': 0.0,
-    }).toList();
+      // Use centralized report data preparation to ensure all PDF fields are present
+      final reportData = _prepareReportData();
 
-    final summary = {
-      'subtotal': calculateTotal(),
-      'totalItemDiscounts': 0.0,
-      'taxAmount': calculateTaxAmount(),
-      'discount': currentState.discount,
-      'finalTotal': calculateFinalTotal(),
-      'youSave': calculateYouSave(),
-    };
+      final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+        storeName: storeName,
+        customerName: currentState.customerName ?? 'N/A',
+        customerMobile: currentState.customerMobile ?? 'N/A',
+        date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
+        items: reportData['items'] as List<Map<String, dynamic>>,
+        summary: reportData['summary'] as Map<String, dynamic>,
+      );
 
-    final pdfBytes = await _pdfGeneratorService.generateBillPdf(
-      storeName: storeName,
-      customerName: currentState.customerName ?? 'N/A',
-      customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
-      items: items,
-      summary: summary,
-    );
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(pdfBytes);
 
-    final output = await getTemporaryDirectory();
-    final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(pdfBytes);
-
-    // Share the PDF file
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'Bill Receipt - ${currentState.customerName ?? 'Customer'}',
-      subject: 'Bill Receipt',
-    );
+      // Share the PDF file
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Bill Receipt - ${currentState.customerName ?? 'Customer'}',
+        subject: 'Bill Receipt',
+      );
+    } catch (e) {
+      emit(BillingError('Failed to share PDF: $e'));
+    }
   }
 }

@@ -112,13 +112,13 @@ class PdfGeneratorService {
                     ),
                     // Item Rows
                     ...items.map((item) {
-                      final mrp = item['mrp'] as double;
-                      final sellingPrice = item['price'] as double;
-                      final discount = item['discount'] as double;
-                      final amtExclTax = item['amtExclTax'] as double;
-                      final taxRate = item['taxRate'] as double;
-                      final taxAmount = item['taxAmount'] as double;
-                      final total = item['total'] as double;
+                      final mrp = (item['mrp'] ?? item['price'] ?? 0.0) as double;
+                      final sellingPrice = (item['price'] ?? 0.0) as double;
+                      final discount = (item['discount'] ?? 0.0) as double;
+                      final amtExclTax = (item['amtExclTax'] ?? 0.0) as double;
+                      final taxRate = (item['taxRate'] ?? 0.0) as double;
+                      final taxAmount = (item['taxAmount'] ?? 0.0) as double;
+                      final total = (item['total'] ?? 0.0) as double;
 
                       return pw.TableRow(
                         children: [
@@ -147,20 +147,20 @@ class PdfGeneratorService {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text('Subtotal: Rs. ${(summary['subtotal'] as double).toStringAsFixed(2)}'),
-                      if ((summary['totalItemDiscounts'] as double) > 0)
+                      pw.Text('Subtotal: Rs. ${(summary['subtotal'] ?? 0.0 as double).toStringAsFixed(2)}'),
+                      if ((summary['totalItemDiscounts'] ?? 0.0 as double) > 0)
                         pw.Text('Item Discounts: Rs. ${(summary['totalItemDiscounts'] as double).toStringAsFixed(2)}'),
-                      if ((summary['taxAmount'] as double) > 0)
+                      if ((summary['taxAmount'] ?? 0.0 as double) > 0)
                         pw.Text('Tax: Rs. ${(summary['taxAmount'] as double).toStringAsFixed(2)}'),
-                      if ((summary['discount'] as double) > 0)
+                      if ((summary['discount'] ?? 0.0 as double) > 0)
                         pw.Text('Additional Discount: Rs. ${(summary['discount'] as double).toStringAsFixed(2)}'),
                       pw.SizedBox(height: 5),
                       pw.Text(
-                        'Final Total: Rs. ${(summary['finalTotal'] as double).toStringAsFixed(2)}',
+                        'Final Total: Rs. ${(summary['finalTotal'] ?? 0.0 as double).toStringAsFixed(2)}',
                         style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
                       ),
                       pw.SizedBox(height: 5),
-                      if ((summary['youSave'] as double) > 0)
+                      if ((summary['youSave'] ?? 0.0 as double) > 0)
                         pw.Text(
                           'You Save: Rs. ${(summary['youSave'] as double).toStringAsFixed(2)}',
                           style: pw.TextStyle(

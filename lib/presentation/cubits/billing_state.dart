@@ -110,6 +110,7 @@ class BillingUpdated extends BillingState {
   final String? duplicateProductName;
   final bool showProfitLossMode;
   final bool isEditMode;
+  final String? billDate;
   final DateTime? lastUpdated; // To force rebuild when needed if props are same
 
   const BillingUpdated({
@@ -123,6 +124,7 @@ class BillingUpdated extends BillingState {
     this.duplicateProductName,
     this.showProfitLossMode = false,
     this.isEditMode = false,
+    this.billDate,
     this.lastUpdated,
   });
 
@@ -137,6 +139,7 @@ class BillingUpdated extends BillingState {
     String? duplicateProductName,
     bool? showProfitLossMode,
     bool? isEditMode,
+    String? billDate,
   }) {
     return BillingUpdated(
       cart: cart ?? this.cart,
@@ -149,6 +152,7 @@ class BillingUpdated extends BillingState {
       duplicateProductName: duplicateProductName ?? this.duplicateProductName,
       showProfitLossMode: showProfitLossMode ?? this.showProfitLossMode,
       isEditMode: isEditMode ?? this.isEditMode,
+      billDate: billDate ?? this.billDate,
       lastUpdated: DateTime.now(),
     );
   }
@@ -165,6 +169,7 @@ class BillingUpdated extends BillingState {
     duplicateProductName, 
     showProfitLossMode, 
     isEditMode,
+    billDate,
     lastUpdated
   ];
 
