@@ -32,7 +32,6 @@ class AnalyticsLoaded extends AnalyticsState {
 
 class AnalyticsError extends AnalyticsState {
   final String message;
-
   AnalyticsError(this.message);
 }
 
@@ -61,66 +60,64 @@ class AnalyticsCubit extends Cubit<AnalyticsState> {
   Future<void> loadAnalytics() async {
     emit(AnalyticsLoading());
     try {
-      // Get current date
       final now = DateTime.now();
-      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      final currentMonth = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final currentMonthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
 
-      // Get today's bills
-      final todayBills = await _billRepository.getBillsByDate(today);
-      final todaySales = todayBills.fold<double>(0, (sum, bill) => sum + bill.finalTotal);
-
-      // Get all bills for monthly calculations
       final allBills = await _billRepository.getAllBills();
-      final monthlyBills = allBills.where((bill) => bill.date.startsWith(currentMonth)).toList();
-      final monthlySales = monthlyBills.fold<double>(0, (sum, bill) => sum + bill.finalTotal);
+      
+      double todaySalesTotal = 0.0;
+      double monthlySalesTotal = 0.0;
+      double monthlyProfitTotal = 0.0;
+      final Map<String, double> brandSales = {};
 
-      // Calculate real monthly profit from bill items
-      double monthlyProfit = 0.0;
-      for (final bill in monthlyBills) {
-        final billItems = await _billRepository.getBillItems(bill.id!);
-        for (final item in billItems) {
-          final profit = (item.sellingPrice - item.purchasePrice - (item.itemDiscount ?? 0)) * item.quantity;
-          monthlyProfit += profit;
-        }
-        // Subtract bill discount
-        monthlyProfit -= bill.discount ?? 0;
-      }
+      for (final bill in allBills) {
+        final isToday = bill.date.startsWith(todayStr);
+        final isThisMonth = bill.date.startsWith(currentMonthStr);
 
-      // Get total products count
-      final allProducts = await _productRepository.getAllProducts();
-      final totalProducts = allProducts.length;
+        if (isToday || isThisMonth) {
+          final items = await _billRepository.getBillItems(bill.id!);
+          
+          double billSubtotal = 0.0;
+          double billTaxAmount = 0.0;
+          double billPurchaseAmount = 0.0;
 
-      // Calculate average order value
-      final averageOrderValue = allBills.isEmpty ? 0.0 : allBills.fold<double>(0, (sum, bill) => sum + bill.finalTotal) / allBills.length;
+          for (final item in items) {
+            final effectivePrice = item.sellingPrice - (item.itemDiscount ?? 0.0);
+            final itemTotal = effectivePrice * item.quantity;
+            
+            billSubtotal += itemTotal;
+            billTaxAmount += itemTotal * ((item.taxRate ?? 0.0) / 100);
+            billPurchaseAmount += item.purchasePrice * item.quantity;
 
-      // Generate category sales from actual bill items (sales by brand)
-      final categorySales = <String, double>{};
-      for (final bill in monthlyBills) {
-        final billItems = await _billRepository.getBillItems(bill.id!);
-        for (final item in billItems) {
-          if (item.productId != null) {
-            final product = await _productRepository.getProductById(item.productId!);
-            if (product != null) {
-              final category = product.brand ?? 'Other';
-              final salesAmount = item.sellingPrice * item.quantity;
-              categorySales[category] = (categorySales[category] ?? 0) + salesAmount;
+            if (isThisMonth) {
+              // Track sales by brand/category
+              final category = item.itemName.split(' ')[0]; // Simplified: use first word of name as category if brand not available
+              brandSales[category] = (brandSales[category] ?? 0) + itemTotal;
             }
+          }
+
+          final finalTotalWithTax = billSubtotal + billTaxAmount - (bill.discount ?? 0.0);
+          
+          if (isToday) todaySalesTotal += finalTotalWithTax;
+          if (isThisMonth) {
+            monthlySalesTotal += finalTotalWithTax;
+            monthlyProfitTotal += (billSubtotal - (bill.discount ?? 0.0)) - billPurchaseAmount;
           }
         }
       }
 
-      // Generate recent activities from real bills
-      final recentActivities = _generateRecentActivities(allBills);
+      final allProducts = await _productRepository.getAllProducts();
+      final averageOrderValue = allBills.isEmpty ? 0.0 : monthlySalesTotal / (allBills.where((b) => b.date.startsWith(currentMonthStr)).length.clamp(1, 999999));
 
       emit(AnalyticsLoaded(
-        todaySales: todaySales,
-        monthlySales: monthlySales,
-        monthlyProfit: monthlyProfit,
-        totalProducts: totalProducts,
+        todaySales: todaySalesTotal,
+        monthlySales: monthlySalesTotal,
+        monthlyProfit: monthlyProfitTotal,
+        totalProducts: allProducts.length,
         averageOrderValue: averageOrderValue,
-        categorySales: categorySales,
-        recentActivities: recentActivities,
+        categorySales: brandSales,
+        recentActivities: _generateRecentActivities(allBills),
       ));
     } catch (e) {
       emit(AnalyticsError('Failed to load analytics: ${e.toString()}'));
@@ -128,52 +125,24 @@ class AnalyticsCubit extends Cubit<AnalyticsState> {
   }
 
   List<RecentActivity> _generateRecentActivities(List<Bill> bills) {
-    final activities = <RecentActivity>[];
-
-    // Sort bills by date (most recent first)
-    bills.sort((a, b) => b.date.compareTo(a.date));
-
-    for (final bill in bills.take(4)) {
-      activities.add(RecentActivity(
-        title: 'Sale completed',
-        subtitle: '₹${bill.finalTotal.toStringAsFixed(2)} bill generated',
-        time: _getTimeAgo(bill.date),
-        icon: Icons.receipt,
-        color: Colors.blue,
-      ));
-    }
-
-    // Add some default activities if we don't have enough bills
-    if (activities.length < 4) {
-      activities.addAll([
-        RecentActivity(
-          title: 'Welcome to Analytics',
-          subtitle: 'Start making sales to see real data',
-          time: 'Now',
-          icon: Icons.info,
-          color: Colors.blue,
-        ),
-      ]);
-    }
-
-    return activities.take(4).toList();
+    final sortedBills = List<Bill>.from(bills)..sort((a, b) => b.date.compareTo(a.date));
+    return sortedBills.take(5).map((bill) => RecentActivity(
+      title: 'Sale completed',
+      subtitle: 'Bill #${bill.id} - ₹${bill.finalTotal.toStringAsFixed(0)}',
+      time: _getTimeAgo(bill.date),
+      icon: Icons.receipt,
+      color: Colors.blue,
+    )).toList();
   }
 
   String _getTimeAgo(String dateString) {
     try {
       final date = DateTime.parse(dateString);
       final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inDays > 0) {
-        return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
-      } else if (difference.inHours > 0) {
-        return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
-      } else {
-        return '${difference.inMinutes} min ago';
-      }
-    } catch (e) {
-      return 'Recently';
-    }
+      final diff = now.difference(date);
+      if (diff.inDays > 0) return '${diff.inDays}d ago';
+      if (diff.inHours > 0) return '${diff.inHours}h ago';
+      return '${diff.inMinutes}m ago';
+    } catch (_) { return 'Recently'; }
   }
 }

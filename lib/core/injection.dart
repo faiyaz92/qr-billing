@@ -30,6 +30,7 @@ import '../presentation/cubits/billing_cubit.dart';
 import '../core/services/i_db_import_export_service.dart';
 import '../core/services/db_import_export_service.dart';
 import '../presentation/cubits/db_import_export_cubit.dart';
+import '../presentation/cubits/thermal_printer_cubit.dart';
 
 final getIt = GetIt.instance;
 
@@ -63,6 +64,7 @@ void setupDependencies() {
   getIt.registerFactory<DbImportExportCubit>(
     () => DbImportExportCubit(getIt<IDbImportExportService>()),
   );
+  getIt.registerFactory<ThermalPrinterCubit>(() => ThermalPrinterCubit(getIt<IThermalPrinterService>()));
 
   // ✅ BillingCubit भी getIt में register करें
   getIt.registerFactory<BillingCubit>(() => BillingCubit(

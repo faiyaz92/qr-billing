@@ -2,6 +2,7 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:qr_based_billing/app_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/injection.dart';
 import '../cubits/splash_cubit.dart';
 import '../cubits/splash_state.dart';
@@ -14,13 +15,17 @@ class SplashScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => getIt<SplashCubit>()..completeSplash(),
-      child: BlocBuilder<SplashCubit, SplashState>(
-        buildWhen: (previous, current) => current is SplashCompleted,
-        builder: (context, state) {
+      child: BlocConsumer<SplashCubit, SplashState>(
+        listener: (context, state) {
           if (state is SplashCompleted) {
             context.router.replace(const HomeRoute());
-            return const SizedBox();
           }
+        },
+        builder: (context, state) {
+          if (state is SplashUpdateRequired) {
+            return _buildUpdateScreen(context, state);
+          }
+
           return Scaffold(
             body: Container(
               decoration: const BoxDecoration(
@@ -91,6 +96,72 @@ class SplashScreen extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildUpdateScreen(BuildContext context, SplashUpdateRequired state) {
+    return Scaffold(
+      body: Container(
+        padding: const EdgeInsets.all(32),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1E40AF), Color(0xFF1E3A8A)],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.system_update,
+                size: 100,
+                color: Colors.white,
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'Update Required',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'A new version of Qr Billing is available (${state.storeVersion}). Please update to continue using the app.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 48),
+              ElevatedButton(
+                onPressed: () async {
+                  final Uri url = Uri.parse(state.storeUrl);
+                  if (await canLaunchUrl(url)) {
+                    await launchUrl(url, mode: LaunchMode.externalApplication);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF1E40AF),
+                  padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'UPDATE NOW',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

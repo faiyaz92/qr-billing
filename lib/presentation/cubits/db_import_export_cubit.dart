@@ -147,6 +147,18 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
     }
   }
 
+  /// Download an existing local backup file to public Downloads folder
+  Future<void> downloadLocalBackupToDevice(String filePath) async {
+    emit(const DbImportExportLoading(message: 'Saving to Downloads...'));
+    try {
+      final format = filePath.endsWith('.db') ? 'db' : 'json';
+      final downloadPath = await _moveToDownloads(filePath);
+      emit(DbDownloadSuccess(filePath: downloadPath, format: format));
+    } catch (e) {
+      emit(DbImportExportError(message: 'Download failed: $e'));
+    }
+  }
+
   Future<String> _moveToDownloads(String sourcePath) async {
     if (Platform.isAndroid) {
       // Request storage permission just in case (mostly needed for Android 10 and below)
@@ -156,17 +168,27 @@ class DbImportExportCubit extends Cubit<DbImportExportState> {
       }
 
       final sourceFile = File(sourcePath);
-      final fileName = sourcePath.split('/').last;
+      String fileName = sourcePath.split('/').last;
+      
+      // Append unique timestamp to prevent "File Already Exists" or "Permission Denied" on overwrite
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString().substring(7); // Use last 6 digits for brevity
+      final nameParts = fileName.split('.');
+      if (nameParts.length > 1) {
+        final ext = nameParts.removeLast();
+        fileName = "${nameParts.join('.')}_$timestamp.$ext";
+      } else {
+        fileName = "${fileName}_$timestamp";
+      }
       
       try {
         final downloadDir = Directory('/storage/emulated/0/Download');
         if (await downloadDir.exists()) {
           final targetPath = '${downloadDir.path}/$fileName';
           await sourceFile.copy(targetPath);
-          return targetPath; // Return the new public path
+          return targetPath; 
         }
       } catch (e) {
-        // Fallback to original path if saving to Downloads fails
+        // Fallback
       }
     }
     return sourcePath;

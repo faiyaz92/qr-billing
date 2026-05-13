@@ -40,11 +40,15 @@ class _ProductListViewState extends State<ProductListView> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<ProductListCubit, ProductListState>(
-      builder: (context, state) {
-        if (state is ProductListLoaded) {
-          return Scaffold(
-            body: Column(
+    return Scaffold(
+      body: BlocBuilder<ProductListCubit, ProductListState>(
+        buildWhen: (prev, curr) => 
+            curr is ProductListLoading || 
+            (prev is ProductListLoaded && curr is ProductListLoaded && (prev.products != curr.products || prev.showQr != curr.showQr || prev.showBarcode != curr.showBarcode)) ||
+            (prev is! ProductListLoaded && curr is ProductListLoaded),
+        builder: (context, state) {
+          if (state is ProductListLoaded) {
+            return Column(
               children: [
                 ProductListAppBar(
                   showQr: state.showQr,
@@ -77,24 +81,22 @@ class _ProductListViewState extends State<ProductListView> {
                   },
                 ),
               ],
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () async {
-                await context.router.push(AddProductRoute());
-                // Screen returned (pop), refresh the product list
-                if (context.mounted) {
-                  context.read<ProductListCubit>().loadProducts();
-                }
-              },
-              elevation: 4,
-              child: const Icon(Icons.add),
-            ),
-          );
-        }
-        return const Scaffold(
-          body: Center(child: CircularProgressIndicator()),
-        );
-      },
+            );
+          }
+          return const Center(child: CircularProgressIndicator());
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          await context.router.push(AddProductRoute());
+          // Screen returned (pop), refresh the product list
+          if (context.mounted) {
+            context.read<ProductListCubit>().loadProducts();
+          }
+        },
+        elevation: 4,
+        child: const Icon(Icons.add),
+      ),
     );
   }
 

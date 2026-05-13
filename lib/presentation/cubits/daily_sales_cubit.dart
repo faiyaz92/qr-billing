@@ -58,25 +58,33 @@ class DailySalesCubit extends Cubit<DailySalesState> {
         for (final bill in dayBills) {
           final items = await _billRepository.getBillItems(bill.id!);
 
-          // Calculate tax from stored bill_items (tax rate + selling price + qty)
+          double billSubtotal = 0.0;
           double billTaxAmount = 0.0;
           double billPurchaseAmount = 0.0;
+
           for (final item in items) {
-            final itemTotal = item.sellingPrice * item.quantity;
-            billTaxAmount += itemTotal * ((item.taxRate ?? 0.0) / 100);
+            final sellingPrice = item.sellingPrice;
+            final itemDiscount = item.itemDiscount ?? 0.0;
+            final effectivePrice = sellingPrice - itemDiscount;
+            final itemTotal = effectivePrice * item.quantity;
+            final taxRate = item.taxRate ?? 0.0;
+            
+            billSubtotal += itemTotal;
+            billTaxAmount += itemTotal * (taxRate / 100);
             billPurchaseAmount += item.purchasePrice * item.quantity;
           }
 
-          // Display: total + tax - discount (what customer paid)
-          final billDisplayTotal = bill.totalAmount + billTaxAmount - (bill.discount ?? 0.0);
-          billDisplayTotals[bill.id!] = billDisplayTotal;
-          totalSales += billDisplayTotal;
-          // Profit: selling - discount - purchase (tax excluded — not our money)
-          totalRevenue += bill.totalAmount - (bill.discount ?? 0.0);
+          final finalTotalWithTax = billSubtotal + billTaxAmount - (bill.discount ?? 0.0);
+          
+          billDisplayTotals[bill.id!] = finalTotalWithTax;
+          totalSales += finalTotalWithTax;
+          
+          totalRevenue += billSubtotal - (bill.discount ?? 0.0);
           totalPurchase += billPurchaseAmount;
         }
 
-        final totalProfit = totalRevenue - totalPurchase; // profit without tax ✅
+        final totalProfit = totalRevenue - totalPurchase;
+ // profit without tax ✅
         final profitPercentage = totalPurchase > 0 ? (totalProfit / totalPurchase) * 100 : 0.0;
 
         dailySales.add(DailySales(
@@ -179,21 +187,44 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       final storeName = await _settingsService.getStoreName() ?? 'Store';
 
       // Generate PDF using centralized service
-      final items = billItems.map((item) => {
-        'name': item.itemName ?? 'Unknown',
-        'quantity': item.quantity,
-        'price': item.sellingPrice,
-        'total': item.sellingPrice * item.quantity,
-        'discount': item.itemDiscount ?? 0.0,
+      final items = billItems.map((item) {
+        final sellingPrice = item.sellingPrice;
+        final discount = item.itemDiscount ?? 0.0;
+        final effectivePrice = sellingPrice - discount;
+        final itemTotalBeforeTax = effectivePrice * item.quantity;
+        final taxRate = item.taxRate ?? 0.0;
+        final taxAmount = itemTotalBeforeTax * (taxRate / 100);
+        final itemTotalAfterTax = itemTotalBeforeTax + taxAmount;
+
+        return {
+          'name': item.itemName ?? 'Unknown',
+          'quantity': item.quantity,
+          'mrp': item.originalPrice ?? sellingPrice,
+          'price': sellingPrice,
+          'discount': discount,
+          'amtExclTax': itemTotalBeforeTax,
+          'taxRate': taxRate,
+          'taxAmount': taxAmount,
+          'total': itemTotalAfterTax,
+        };
       }).toList();
 
+      // Calculate Rock Solid savings for PDF
+      final subtotal = bill.totalAmount;
+      final taxAmount = billItems.fold<double>(0, (sum, item) => sum + (((item.sellingPrice - (item.itemDiscount ?? 0.0)) * item.quantity) * (item.taxRate ?? 0.0) / 100));
+      final taxRate = subtotal > 0 ? (taxAmount / subtotal) : 0.0;
+      // Now using stored originalPrice (MRP) from database
+      final originalTotal = billItems.fold<double>(0, (sum, item) => sum + ((item.originalPrice ?? item.sellingPrice) * item.quantity));
+      final originalTotalWithTax = originalTotal + (originalTotal * taxRate);
+      final youSave = originalTotalWithTax - bill.finalTotal;
+
       final summary = {
-        'subtotal': bill.totalAmount,
-        'totalItemDiscounts': 0.0,
-        'taxAmount': billItems.fold<double>(0, (sum, item) => sum + ((item.sellingPrice * item.quantity) * (item.taxRate ?? 0.0) / 100)),
+        'subtotal': subtotal,
+        'totalItemDiscounts': billItems.fold<double>(0, (sum, item) => sum + ((item.itemDiscount ?? 0.0) * item.quantity)),
+        'taxAmount': taxAmount,
         'discount': bill.discount ?? 0.0,
         'finalTotal': bill.finalTotal,
-        'youSave': bill.discount ?? 0.0,
+        'youSave': youSave,
       };
 
       final pdfBytes = await _pdfGeneratorService.generateBillPdf(

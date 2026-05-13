@@ -1,37 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../cubits/billing_cubit.dart';
-
-class BillSummaryData {
-  final List<CartItem> cart;
-  final double subtotal;
-  final double taxAmount;
-  final double discount;
-  final double finalTotal;
-  final double totalPurchase;
-  final double expectedProfit;
-  final double actualProfit;
-  final double youSave;
-  final bool showProfitLossMode;
-  final bool isEditMode;
-  final String? customerName;
-  final String? customerMobile;
-
-  const BillSummaryData({
-    required this.cart,
-    required this.subtotal,
-    required this.taxAmount,
-    required this.discount,
-    required this.finalTotal,
-    required this.totalPurchase,
-    required this.expectedProfit,
-    required this.actualProfit,
-    required this.youSave,
-    required this.showProfitLossMode,
-    required this.isEditMode,
-    this.customerName,
-    this.customerMobile,
-  });
-}
+import '../../cubits/billing_state.dart';
 
 class BillSummaryBottomSheet extends StatefulWidget {
   final BillSummaryData data;

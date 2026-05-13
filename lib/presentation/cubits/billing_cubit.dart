@@ -18,38 +18,7 @@ import 'dart:io';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 
-class CartItem {
-  final ScannedData data;
-  final Product product;
-  int quantity;
-  double itemDiscount; // Individual item discount
-
-  CartItem({required this.data, required this.product, this.quantity = 1, this.itemDiscount = 0.0});
-}
-
-abstract class BillingState {}
-
-class BillingLoading extends BillingState {}
-
-class BillingUpdated extends BillingState {
-  final List<CartItem> cart;
-  final bool isScanningPaused;
-  final String? customerMobile;
-  final String? customerName;
-  final double discount;
-  final double taxRate; // Tax rate in percentage (e.g., 18.0 for 18%)
-  final bool duplicateDetected;
-  final String? duplicateProductName;
-  final bool showProfitLossMode; // New field for profit/loss toggle
-  final bool isEditMode; // New field for edit mode
-
-  BillingUpdated(this.cart, {this.isScanningPaused = false, this.customerMobile, this.customerName, this.discount = 0.0, this.taxRate = 0.0, this.duplicateDetected = false, this.duplicateProductName, this.showProfitLossMode = false, this.isEditMode = false});
-}
-
-class BillingError extends BillingState {
-  final String message;
-  BillingError(this.message);
-}
+import 'billing_state.dart';
 
 class BillingCubit extends Cubit<BillingState> {
   final IScanService _scanService;
@@ -76,23 +45,14 @@ class BillingCubit extends Cubit<BillingState> {
        _settingsService = settingsService,
        _billRepository = billRepository,
        _pdfGeneratorService = pdfGeneratorService,
-       super(BillingUpdated([], showProfitLossMode: false, isEditMode: false, taxRate: 0.0));
+       super(const BillingUpdated(cart: [], showProfitLossMode: false, isEditMode: false, taxRate: 0.0));
 
   void toggleProfitLossMode() {
     _showProfitLossMode = !_showProfitLossMode;
-    final currentState = state as BillingUpdated;
-    emit(BillingUpdated(
-      List.from(_cart),
-      isScanningPaused: currentState.isScanningPaused,
-      customerMobile: currentState.customerMobile,
-      customerName: currentState.customerName,
-      discount: currentState.discount,
-      taxRate: currentState.taxRate,
-      duplicateDetected: currentState.duplicateDetected,
-      duplicateProductName: currentState.duplicateProductName,
-      showProfitLossMode: _showProfitLossMode,
-      isEditMode: _isEditMode,
-    ));
+    final currentState = state;
+    if (currentState is BillingUpdated) {
+      emit(currentState.copyWith(showProfitLossMode: _showProfitLossMode));
+    }
   }
 
   void addProductToCart({
@@ -118,28 +78,23 @@ class BillingCubit extends Cubit<BillingState> {
         quantity: quantity,
       ));
     } else {
-      _cart[existingIndex].quantity += quantity;
+      _cart[existingIndex] = _cart[existingIndex].copyWith(
+        quantity: _cart[existingIndex].quantity + quantity,
+      );
     }
 
     final currentState = state;
     if (currentState is BillingUpdated) {
-      emit(BillingUpdated(
-        List.from(_cart),
-        isScanningPaused: currentState.isScanningPaused,
-        customerMobile: currentState.customerMobile,
-        customerName: currentState.customerName,
-        discount: currentState.discount,
-        taxRate: currentState.taxRate,
+      emit(currentState.copyWith(
+        cart: List.from(_cart),
         duplicateDetected: false,
         duplicateProductName: null,
-        showProfitLossMode: _showProfitLossMode,
-        isEditMode: _isEditMode,
       ));
       return;
     }
 
     emit(BillingUpdated(
-      List.from(_cart),
+      cart: List.from(_cart),
       showProfitLossMode: _showProfitLossMode,
       isEditMode: _isEditMode,
     ));
@@ -150,8 +105,6 @@ class BillingCubit extends Cubit<BillingState> {
     try {
       final scannedData = await _scanService.scanAndDecode(qrCode);
       if (scannedData != null) {
-        // Debug: Print scanned data
-        print('Scanned data: ${scannedData.data}');
         final productData = scannedData.data;
         
         // Decrypt sensitive data to get purchase price
@@ -161,9 +114,7 @@ class BillingCubit extends Cubit<BillingState> {
             final decryptedSensitive = _encryptionService.decryptData(productData['encrypted_sensitive']);
             final sensitiveData = jsonDecode(decryptedSensitive) as Map<String, dynamic>;
             purchasePrice = double.tryParse(sensitiveData['purchase_price']?.toString() ?? '0') ?? 0.0;
-            print('Decrypted purchase price: $purchasePrice');
           } catch (e) {
-            print('Failed to decrypt sensitive data: $e');
             purchasePrice = 0.0;
           }
         }
@@ -190,54 +141,73 @@ class BillingCubit extends Cubit<BillingState> {
           qrData: product.qrData,
           purchasePrice: product.purchasePrice,
         );
-        
-        // Debug: Print created product
-        print('Created product: ${productWithId.name}, ID: ${productWithId.id}, selling: ${productWithId.sellingPrice}, purchase: ${productWithId.purchasePrice}');
 
         // Check if already in cart (by QR code to prevent duplicates)
         final existingIndex = _cart.indexWhere((item) => item.data.qrCode == scannedData.qrCode);
         if (existingIndex == -1) {
           _cart.add(CartItem(data: scannedData, product: productWithId));
-          print('Added new item to cart. Cart size: ${_cart.length}');
-          emit(BillingUpdated(List.from(_cart), isScanningPaused: !continuousScan, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
-          print('Emitted BillingUpdated state with ${_cart.length} items, paused: ${!continuousScan}');
+          final currentState = state;
+          if (currentState is BillingUpdated) {
+             emit(currentState.copyWith(
+               cart: List.from(_cart),
+               isScanningPaused: !continuousScan,
+             ));
+          } else {
+            emit(BillingUpdated(cart: List.from(_cart), isScanningPaused: !continuousScan, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+          }
         } else {
-          print('Product already in cart, emitting duplicate notification');
-          // For duplicate, emit BillingUpdated with current cart and duplicate flag
-          emit(BillingUpdated(List.from(_cart), isScanningPaused: false, duplicateDetected: true, duplicateProductName: productWithId.name ?? 'Unknown Product', showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+          final currentState = state;
+          if (currentState is BillingUpdated) {
+            emit(currentState.copyWith(
+              duplicateDetected: true,
+              duplicateProductName: productWithId.name ?? 'Unknown Product',
+            ));
+          }
         }
         // Pause handled in screen
       } else {
         emit(BillingError('Invalid QR'));
       }
-    } catch (e, stackTrace) {
-      print('Error in scanProduct: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
       emit(BillingError(e.toString()));
     }
   }
 
   void updateQuantity(int index, int delta) {
     if (index >= 0 && index < _cart.length) {
-      _cart[index].quantity += delta;
-      if (_cart[index].quantity <= 0) {
+      final newQuantity = _cart[index].quantity + delta;
+      if (newQuantity <= 0) {
         _cart.removeAt(index);
+      } else {
+        _cart[index] = _cart[index].copyWith(quantity: newQuantity);
       }
-      emit(BillingUpdated(List.from(_cart), showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+      emit(BillingUpdated(
+        cart: List.from(_cart), 
+        showProfitLossMode: _showProfitLossMode, 
+        isEditMode: _isEditMode
+      ));
     }
   }
 
   void updateItemDiscount(int index, double discount) {
     if (index >= 0 && index < _cart.length) {
-      _cart[index].itemDiscount = discount;
-      emit(BillingUpdated(List.from(_cart), showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+      _cart[index] = _cart[index].copyWith(itemDiscount: discount);
+      emit(BillingUpdated(
+        cart: List.from(_cart), 
+        showProfitLossMode: _showProfitLossMode, 
+        isEditMode: _isEditMode
+      ));
     }
   }
 
   void removeItem(int index) {
     if (index >= 0 && index < _cart.length) {
       _cart.removeAt(index);
-      emit(BillingUpdated(List.from(_cart), showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+      emit(BillingUpdated(
+        cart: List.from(_cart), 
+        showProfitLossMode: _showProfitLossMode, 
+        isEditMode: _isEditMode
+      ));
     }
   }
 
@@ -245,13 +215,21 @@ class BillingCubit extends Cubit<BillingState> {
     _cart.clear();
     _currentBillId = null; // Reset bill ID when clearing cart
     _isEditMode = false; // Reset edit mode when clearing cart
-    emit(BillingUpdated(List.from(_cart), showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    emit(BillingUpdated(
+      cart: List.from(_cart), 
+      showProfitLossMode: _showProfitLossMode, 
+      isEditMode: _isEditMode
+    ));
   }
 
-  Future<void> saveBill(double discount) async {
-    final currentState = state as BillingUpdated;
+  Future<void> saveBill() async {
+    final currentState = state;
+    if (currentState is! BillingUpdated) return;
+
+    final discount = currentState.discount;
     final total = calculateTotal();
-    final finalTotal = total - discount;
+    final taxAmount = calculateTaxAmount();
+    final finalTotal = total + taxAmount - discount;
 
     // Calculate total purchase amount for profit tracking
     final purchaseAmount = _cart.fold(0.0, (sum, item) => sum + (item.product.purchasePrice * item.quantity));
@@ -289,6 +267,7 @@ class BillingCubit extends Cubit<BillingState> {
         itemDiscount: item.itemDiscount, // Use actual item discount
         purchasePrice: item.product.purchasePrice,
         sellingPrice: item.product.sellingPrice,
+        originalPrice: item.product.originalPrice, // Save original price (MRP)
         taxRate: item.product.tax ?? 0.0,
       );
       await _billRepository.insertBillItem(billItem);
@@ -298,24 +277,73 @@ class BillingCubit extends Cubit<BillingState> {
   }
 
   Future<void> markBillAsPaid() async {
-    final currentState = state as BillingUpdated;
-    await saveBill(currentState.discount);
+    await saveBill();
     clearCart(); // Clear cart after payment
   }
 
   void setCustomerMobile(String mobile) {
-    final currentState = state as BillingUpdated;
-    emit(BillingUpdated(List.from(_cart), customerMobile: mobile, customerName: currentState.customerName, discount: currentState.discount, taxRate: currentState.taxRate, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    final currentState = state;
+    if (currentState is BillingUpdated) {
+      emit(currentState.copyWith(customerMobile: mobile));
+    }
   }
 
   void setCustomerName(String name) {
-    final currentState = state as BillingUpdated;
-    emit(BillingUpdated(List.from(_cart), customerMobile: currentState.customerMobile, customerName: name, discount: currentState.discount, taxRate: currentState.taxRate, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    final currentState = state;
+    if (currentState is BillingUpdated) {
+      emit(currentState.copyWith(customerName: name));
+    }
   }
 
   void setDiscount(double discount) {
-    final currentState = state as BillingUpdated;
-    emit(BillingUpdated(List.from(_cart), customerMobile: currentState.customerMobile, customerName: currentState.customerName, discount: discount, taxRate: currentState.taxRate, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    final currentState = state;
+    if (currentState is BillingUpdated) {
+      emit(currentState.copyWith(discount: discount));
+    }
+  }
+
+  BillSummaryData getSummaryData() {
+    final currentState = state;
+    if (currentState is! BillingUpdated) {
+      return BillSummaryData(
+        cart: [],
+        subtotal: 0,
+        taxAmount: 0,
+        discount: 0,
+        finalTotal: 0,
+        totalPurchase: 0,
+        expectedProfit: 0,
+        actualProfit: 0,
+        youSave: 0,
+        showProfitLossMode: _showProfitLossMode,
+        isEditMode: _isEditMode,
+      );
+    }
+
+    final subtotal = calculateTotal();
+    final taxAmount = calculateTaxAmount();
+    final finalTotal = calculateFinalTotal();
+    final youSave = calculateYouSave();
+
+    final totalPurchase = _showProfitLossMode
+        ? _cart.fold<double>(
+            0.0,
+            (sum, item) => sum + (item.product.purchasePrice * item.quantity),
+          )
+        : 0.0;
+
+    final expectedProfit = subtotal - totalPurchase;
+    final actualProfit = (subtotal - currentState.discount) - totalPurchase;
+
+    return currentState.getSummary(
+      subtotal,
+      taxAmount,
+      finalTotal,
+      youSave,
+      totalPurchase,
+      expectedProfit,
+      actualProfit,
+    );
   }
 
   void setTaxRate(double taxRate) {
@@ -326,90 +354,74 @@ class BillingCubit extends Cubit<BillingState> {
 
   Future<void> printBill() async {
     final currentState = state as BillingUpdated;
+    await saveBill();
 
-    // Save bill before printing (will update if already exists)
-    await saveBill(currentState.discount);
-
-    // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
+    final reportData = _prepareReportData();
 
-    // Prepare bill data for PrintManager
-    final items = _cart.map((item) {
-      final itemTotal = (item.product.sellingPrice - item.itemDiscount) * item.quantity;
-      return {
-        'name': item.product.name,
-        'quantity': item.quantity,
-        'total': itemTotal,
-        'discount': item.itemDiscount,
-      };
-    }).toList();
-
-    // Calculate summary data
-    final subtotal = calculateTotal();
-    final totalItemDiscounts = _cart.fold<double>(0.0, (sum, item) => sum + (item.itemDiscount * item.quantity));
-    final taxAmount = calculateTaxAmount();
-    final finalTotal = calculateFinalTotal();
-
-    // Calculate You Save
-    final originalTotal = _cart.fold<double>(
-      0.0,
-      (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity),
-    );
-    final originalTotalWithTax = originalTotal + (originalTotal * (taxAmount / subtotal));
-    final youSave = originalTotalWithTax - finalTotal;
-
-    final summary = {
-      'subtotal': subtotal,
-      'totalItemDiscounts': totalItemDiscounts,
-      'taxAmount': taxAmount,
-      'discount': currentState.discount,
-      'finalTotal': finalTotal,
-      'youSave': youSave,
-    };
-
-    // Use PrintManager for centralized printing
     await _printManager.printBill(
       storeName: storeName,
       customerName: currentState.customerName ?? 'N/A',
       customerMobile: currentState.customerMobile ?? 'N/A',
       date: DateTime.now().toString().split(' ')[0],
-      items: items,
-      summary: summary,
+      items: reportData['items'] as List<Map<String, dynamic>>,
+      summary: reportData['summary'] as Map<String, dynamic>,
     );
+  }
+
+  Map<String, dynamic> _prepareReportData() {
+    final currentState = state as BillingUpdated;
+    final summary = getSummaryData();
+
+    final items = _cart.map((item) {
+      final sellingPrice = item.product.sellingPrice;
+      final discount = item.itemDiscount;
+      final effectivePrice = sellingPrice - discount;
+      final itemTotalBeforeTax = effectivePrice * item.quantity;
+      final taxRate = item.product.tax ?? 0.0;
+      final taxAmount = itemTotalBeforeTax * (taxRate / 100);
+      final itemTotalAfterTax = itemTotalBeforeTax + taxAmount;
+
+      return {
+        'name': item.product.name,
+        'quantity': item.quantity,
+        'mrp': item.product.originalPrice ?? sellingPrice,
+        'price': sellingPrice,
+        'discount': discount,
+        'amtExclTax': itemTotalBeforeTax, // Price after discount, before tax
+        'taxRate': taxRate,
+        'taxAmount': taxAmount,
+        'total': itemTotalAfterTax, // Item total including tax
+      };
+    }).toList();
+
+    return {
+      'items': items,
+      'summary': {
+        'subtotal': summary.subtotal,
+        'totalItemDiscounts': _cart.fold<double>(0.0, (sum, item) => sum + (item.itemDiscount * item.quantity)),
+        'taxAmount': summary.taxAmount,
+        'discount': summary.discount,
+        'finalTotal': summary.finalTotal,
+        'youSave': summary.youSave,
+      }
+    };
   }
 
   Future<void> shareViaEmail(String email) async {
     final currentState = state as BillingUpdated;
-    await saveBill(currentState.discount);
+    await saveBill();
 
-    // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
-
-    // Generate PDF using centralized service
-    final items = _cart.map((item) => {
-      'name': item.data.data['name'] ?? 'Unknown',
-      'quantity': item.quantity,
-      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
-      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
-      'discount': 0.0,
-    }).toList();
-
-    final summary = {
-      'subtotal': calculateTotal(),
-      'totalItemDiscounts': 0.0,
-      'taxAmount': calculateTaxAmount(),
-      'discount': currentState.discount,
-      'finalTotal': calculateFinalTotal(),
-      'youSave': calculateYouSave(),
-    };
+    final reportData = _prepareReportData();
 
     final pdfBytes = await _pdfGeneratorService.generateBillPdf(
       storeName: storeName,
       customerName: currentState.customerName ?? 'N/A',
       customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
-      items: items,
-      summary: summary,
+      date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
+      items: reportData['items'] as List<Map<String, dynamic>>,
+      summary: reportData['summary'] as Map<String, dynamic>,
     );
 
     final output = await getTemporaryDirectory();
@@ -426,36 +438,18 @@ class BillingCubit extends Cubit<BillingState> {
 
   Future<void> shareViaWhatsApp(String mobile) async {
     final currentState = state as BillingUpdated;
-    await saveBill(currentState.discount);
+    await saveBill();
 
-    // Get store name
     final storeName = await _settingsService.getStoreName() ?? 'Store';
-
-    // Generate PDF using centralized service
-    final items = _cart.map((item) => {
-      'name': item.data.data['name'] ?? 'Unknown',
-      'quantity': item.quantity,
-      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
-      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
-      'discount': 0.0,
-    }).toList();
-
-    final summary = {
-      'subtotal': calculateTotal(),
-      'totalItemDiscounts': 0.0,
-      'taxAmount': calculateTaxAmount(),
-      'discount': currentState.discount,
-      'finalTotal': calculateFinalTotal(),
-      'youSave': calculateYouSave(),
-    };
+    final reportData = _prepareReportData();
 
     final pdfBytes = await _pdfGeneratorService.generateBillPdf(
       storeName: storeName,
       customerName: currentState.customerName ?? 'N/A',
       customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
-      items: items,
-      summary: summary,
+      date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
+      items: reportData['items'] as List<Map<String, dynamic>>,
+      summary: reportData['summary'] as Map<String, dynamic>,
     );
 
     final output = await getTemporaryDirectory();
@@ -474,7 +468,6 @@ class BillingCubit extends Cubit<BillingState> {
   }
 
   Future<void> loadBillForView(int billId) async {
-    print('Loading bill for view: $billId');
     final items = await _billRepository.getBillItems(billId);
     final bill = await _billRepository.getBillById(billId);
     
@@ -483,22 +476,16 @@ class BillingCubit extends Cubit<BillingState> {
       return;
     }
     
-    print('Bill data: discount=${bill.discount}, totalAmount=${bill.totalAmount}');
-    
     // Clear cart
     _cart.clear();
     _currentBillId = billId; // Set current bill ID for updates
     _isEditMode = true; // Enable edit mode
     // Add items - create ScannedData from bill item data
     for (final item in items) {
-      print('Processing bill item: id=${item.id}, productId=${item.productId}, itemName=${item.itemName}, taxRate=${item.taxRate}');
-      
       // Use item name directly from bill item (no dependency on products table)
       String productName = item.itemName;
       String? brand = null; // Brand not stored in bill items
       double taxRate = item.taxRate ?? 0.0;
-      
-      print('Using item name from bill: $productName, tax: $taxRate');
       
       // Create a Product from bill item data
       final product = Product(
@@ -507,7 +494,7 @@ class BillingCubit extends Cubit<BillingState> {
         brand: brand,
         sellingPrice: item.sellingPrice,
         purchasePrice: item.purchasePrice,
-        originalPrice: null,
+        originalPrice: item.originalPrice, // Restore original price (MRP)
         tax: taxRate,
         qrData: null,
       );
@@ -527,7 +514,15 @@ class BillingCubit extends Cubit<BillingState> {
       
       _cart.add(CartItem(data: scannedData, product: product, quantity: item.quantity, itemDiscount: item.itemDiscount ?? 0.0));
     }
-    emit(BillingUpdated(List.from(_cart), discount: bill.discount ?? 0.0, customerName: bill.customerName, customerMobile: bill.customerMobile, showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    emit(BillingUpdated(
+      cart: List.from(_cart), 
+      discount: bill.discount ?? 0.0, 
+      customerName: bill.customerName, 
+      customerMobile: bill.customerMobile, 
+      showProfitLossMode: _showProfitLossMode, 
+      isEditMode: _isEditMode,
+      billDate: bill.date,
+    ));
   }
 
   double calculateTotal() {
@@ -552,8 +547,15 @@ class BillingCubit extends Cubit<BillingState> {
 
   double calculateYouSave() {
     final originalTotal = _cart.fold(0.0, (sum, item) => sum + ((item.product.originalPrice ?? item.product.sellingPrice) * item.quantity));
+    final subtotal = calculateTotal();
     final taxAmount = calculateTaxAmount();
-    return originalTotal + taxAmount - calculateFinalTotal();
+    
+    // Estimate tax on MRP using the average tax rate of current items
+    final taxRate = subtotal > 0 ? (taxAmount / subtotal) : 0.0;
+    final originalTotalWithTax = originalTotal + (originalTotal * taxRate);
+    
+    final finalTotal = calculateFinalTotal();
+    return originalTotalWithTax - finalTotal;
   }
 
   // Temporary method for testing in emulator - adds dummy products to cart
@@ -619,54 +621,47 @@ class BillingCubit extends Cubit<BillingState> {
       }
     }
 
-    emit(BillingUpdated(List.from(_cart), showProfitLossMode: _showProfitLossMode, isEditMode: _isEditMode));
+    emit(BillingUpdated(
+      cart: List.from(_cart), 
+      showProfitLossMode: _showProfitLossMode, 
+      isEditMode: _isEditMode
+    ));
   }
 
   Future<void> shareBillPdf() async {
     final currentState = state as BillingUpdated;
 
-    // Save bill before sharing (will update if already exists)
-    await saveBill(currentState.discount);
+    try {
+      // Save bill before sharing (will update if already exists)
+      await saveBill();
 
-    // Get store name
-    final storeName = await _settingsService.getStoreName() ?? 'Store';
+      // Get store name
+      final storeName = await _settingsService.getStoreName() ?? 'Store';
 
-    // Generate PDF using centralized service
-    final items = _cart.map((item) => {
-      'name': item.data.data['name'] ?? 'Unknown',
-      'quantity': item.quantity,
-      'price': double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0,
-      'total': (double.tryParse(item.data.data['selling_price']?.toString() ?? '0') ?? 0.0) * item.quantity,
-      'discount': 0.0,
-    }).toList();
+      // Use centralized report data preparation to ensure all PDF fields are present
+      final reportData = _prepareReportData();
 
-    final summary = {
-      'subtotal': calculateTotal(),
-      'totalItemDiscounts': 0.0,
-      'taxAmount': calculateTaxAmount(),
-      'discount': currentState.discount,
-      'finalTotal': calculateFinalTotal(),
-      'youSave': calculateYouSave(),
-    };
+      final pdfBytes = await _pdfGeneratorService.generateBillPdf(
+        storeName: storeName,
+        customerName: currentState.customerName ?? 'N/A',
+        customerMobile: currentState.customerMobile ?? 'N/A',
+        date: currentState.billDate ?? DateTime.now().toString().split(' ')[0],
+        items: reportData['items'] as List<Map<String, dynamic>>,
+        summary: reportData['summary'] as Map<String, dynamic>,
+      );
 
-    final pdfBytes = await _pdfGeneratorService.generateBillPdf(
-      storeName: storeName,
-      customerName: currentState.customerName ?? 'N/A',
-      customerMobile: currentState.customerMobile ?? 'N/A',
-      date: DateTime.now().toString().split(' ')[0],
-      items: items,
-      summary: summary,
-    );
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(pdfBytes);
 
-    final output = await getTemporaryDirectory();
-    final file = File('${output.path}/bill_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(pdfBytes);
-
-    // Share the PDF file
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      text: 'Bill Receipt - ${currentState.customerName ?? 'Customer'}',
-      subject: 'Bill Receipt',
-    );
+      // Share the PDF file
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Bill Receipt - ${currentState.customerName ?? 'Customer'}',
+        subject: 'Bill Receipt',
+      );
+    } catch (e) {
+      emit(BillingError('Failed to share PDF: $e'));
+    }
   }
 }

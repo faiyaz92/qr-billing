@@ -4,6 +4,8 @@ abstract class ProductListState {}
 
 class ProductListInitial extends ProductListState {}
 
+class ProductListLoading extends ProductListState {}
+
 class ProductListLoaded extends ProductListState {
   final List<Product> products;
   final bool showQr;

@@ -1,0 +1,7 @@
+{
+    "dart.hotReloadOnSave": "all",
+    "dart.flutterHotReloadOnSave": "all",
+    "editor.formatOnSave": true,
+    "dart.flutterSdkPath": "/Users/faiyaz/flutter",
+    "dart.sdkPath": "/Users/faiyaz/flutter/bin/cache/dart-sdk"
+}

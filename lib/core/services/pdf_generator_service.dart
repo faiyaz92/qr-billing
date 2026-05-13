@@ -86,60 +86,54 @@ class PdfGeneratorService {
 
                 // Items Table
                 pw.Table(
-                  border: pw.TableBorder.all(),
+                  border: pw.TableBorder.all(color: PdfColors.grey300),
+                  columnWidths: {
+                    0: const pw.FlexColumnWidth(3), // Item Name
+                    1: const pw.FlexColumnWidth(0.8), // Qty
+                    2: const pw.FlexColumnWidth(1.8), // Price (MRP/Sell)
+                    3: const pw.FlexColumnWidth(1.2), // Disc
+                    4: const pw.FlexColumnWidth(1.8), // Amt (Excl. Tax)
+                    5: const pw.FlexColumnWidth(1.8), // Tax (%/Amt)
+                    6: const pw.FlexColumnWidth(2), // Total
+                  },
                   children: [
                     // Header Row
                     pw.TableRow(
                       decoration: const pw.BoxDecoration(color: PdfColors.grey200),
                       children: [
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Item', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Qty', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Price', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
-                        pw.Container(
-                          padding: const pw.EdgeInsets.all(5),
-                          child: pw.Text('Total', style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                        ),
+                        _buildHeaderCell('Item'),
+                        _buildHeaderCell('Qty'),
+                        _buildHeaderCell('Price'),
+                        _buildHeaderCell('Disc'),
+                        _buildHeaderCell('Amt\n(Excl Tax)'),
+                        _buildHeaderCell('Tax'),
+                        _buildHeaderCell('Total'),
                       ],
                     ),
                     // Item Rows
                     ...items.map((item) {
+                      final mrp = (item['mrp'] ?? item['price'] ?? 0.0) as double;
+                      final sellingPrice = (item['price'] ?? 0.0) as double;
+                      final discount = (item['discount'] ?? 0.0) as double;
+                      final amtExclTax = (item['amtExclTax'] ?? 0.0) as double;
+                      final taxRate = (item['taxRate'] ?? 0.0) as double;
+                      final taxAmount = (item['taxAmount'] ?? 0.0) as double;
+                      final total = (item['total'] ?? 0.0) as double;
+
                       return pw.TableRow(
                         children: [
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text(item['name'] ?? 'Unknown Product'),
-                                if ((item['discount'] ?? 0.0) > 0)
-                                  pw.Text(
-                                    '(Discount: Rs. ${((item['discount'] as double) * (item['quantity'] as int)).toStringAsFixed(2)})',
-                                    style: pw.TextStyle(fontSize: 10, color: PdfColors.grey600),
-                                  ),
-                              ],
-                            ),
+                          _buildCell(item['name'] ?? 'Unknown'),
+                          _buildCell('${item['quantity']}'),
+                          _buildCell(
+                            mrp > sellingPrice 
+                              ? 'MRP: ${mrp.toStringAsFixed(0)}\nSell: ${sellingPrice.toStringAsFixed(0)}'
+                              : sellingPrice.toStringAsFixed(0),
+                            align: pw.TextAlign.right
                           ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('${item['quantity']}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Rs. ${(item['price'] as double).toStringAsFixed(2)}'),
-                          ),
-                          pw.Container(
-                            padding: const pw.EdgeInsets.all(5),
-                            child: pw.Text('Rs. ${(item['total'] as double).toStringAsFixed(2)}'),
-                          ),
+                          _buildCell(discount > 0 ? discount.toStringAsFixed(0) : '-', align: pw.TextAlign.right),
+                          _buildCell(amtExclTax.toStringAsFixed(0), align: pw.TextAlign.right),
+                          _buildCell('${taxRate.toStringAsFixed(0)}%\n(${taxAmount.toStringAsFixed(1)})', align: pw.TextAlign.right),
+                          _buildCell(total.toStringAsFixed(2), align: pw.TextAlign.right, isBold: true),
                         ],
                       );
                     }),
@@ -153,20 +147,20 @@ class PdfGeneratorService {
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text('Subtotal: Rs. ${(summary['subtotal'] as double).toStringAsFixed(2)}'),
-                      if ((summary['totalItemDiscounts'] as double) > 0)
+                      pw.Text('Subtotal: Rs. ${(summary['subtotal'] ?? 0.0 as double).toStringAsFixed(2)}'),
+                      if ((summary['totalItemDiscounts'] ?? 0.0 as double) > 0)
                         pw.Text('Item Discounts: Rs. ${(summary['totalItemDiscounts'] as double).toStringAsFixed(2)}'),
-                      if ((summary['taxAmount'] as double) > 0)
+                      if ((summary['taxAmount'] ?? 0.0 as double) > 0)
                         pw.Text('Tax: Rs. ${(summary['taxAmount'] as double).toStringAsFixed(2)}'),
-                      if ((summary['discount'] as double) > 0)
+                      if ((summary['discount'] ?? 0.0 as double) > 0)
                         pw.Text('Additional Discount: Rs. ${(summary['discount'] as double).toStringAsFixed(2)}'),
                       pw.SizedBox(height: 5),
                       pw.Text(
-                        'Final Total: Rs. ${(summary['finalTotal'] as double).toStringAsFixed(2)}',
+                        'Final Total: Rs. ${(summary['finalTotal'] ?? 0.0 as double).toStringAsFixed(2)}',
                         style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
                       ),
                       pw.SizedBox(height: 5),
-                      if ((summary['youSave'] as double) > 0)
+                      if ((summary['youSave'] ?? 0.0 as double) > 0)
                         pw.Text(
                           'You Save: Rs. ${(summary['youSave'] as double).toStringAsFixed(2)}',
                           style: pw.TextStyle(
@@ -207,5 +201,30 @@ class PdfGeneratorService {
     );
 
     return await pdf.save();
+  }
+
+  pw.Widget _buildHeaderCell(String text) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(5),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10),
+        textAlign: pw.TextAlign.center,
+      ),
+    );
+  }
+
+  pw.Widget _buildCell(String text, {pw.TextAlign align = pw.TextAlign.left, bool isBold = false}) {
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(5),
+      child: pw.Text(
+        text,
+        style: pw.TextStyle(
+          fontSize: 9,
+          fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal,
+        ),
+        textAlign: align,
+      ),
+    );
   }
 }
