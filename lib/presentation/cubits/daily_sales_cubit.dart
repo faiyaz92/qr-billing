@@ -32,7 +32,13 @@ class DailySalesCubit extends Cubit<DailySalesState> {
       final filteredBills = bills.where((bill) {
         final billDate = DateTime.parse(bill.date);
         final matchesMonthYear = billDate.month == _selectedMonth && billDate.year == _selectedYear;
-        final matchesSearch = _searchQuery.isEmpty || bill.id.toString().contains(_searchQuery);
+        
+        final query = _searchQuery.toLowerCase();
+        final matchesSearch = _searchQuery.isEmpty || 
+            bill.id.toString().contains(_searchQuery) ||
+            (bill.customerName?.toLowerCase().contains(query) ?? false) ||
+            (bill.customerMobile?.contains(_searchQuery) ?? false);
+            
         return matchesMonthYear && matchesSearch;
       }).toList();
       final Map<String, List<Bill>> billsByDate = {};
